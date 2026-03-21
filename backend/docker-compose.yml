@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: crm_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: crm_database
+    networks:
+      - crm_network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crm_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - DATABASE_NAME=crm_database
+      - SECRET_KEY=change-this-secret-key-in-production
+      - BACKEND_CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
+    depends_on:
+      - mongodb
+    networks:
+      - crm_network
+    command: sh -c "sleep 5 && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  mongodb_data:
+
+networks:
+  crm_network:
+    driver: bridge
