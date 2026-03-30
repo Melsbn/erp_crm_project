@@ -69,14 +69,15 @@ async def _groq_call(messages: List[Dict], temperature: float = 0.3) -> str:
 
 def _detect_intent(question: str, history_text: str) -> Dict[str, bool]:
     q = question.lower() + " " + history_text.lower()
-    wants_sales    = any(w in q for w in ["vente", "ventes", "chiffre", "prévision", "forecast", "revenu", "revenus", "mois", "mensuel", "croissance", "pourcentage", "ca ", "c.a"])
-    wants_products = any(w in q for w in ["produit", "produits", "article", "articles", "stock", "populaire"])
-    wants_clients  = any(w in q for w in ["client", "clients", "acheteur", "commande", "commandes", "dépensé", "depensé", "trie", "montant", "email", "contact", "telephone", "adresse", "meilleur", "qui ", "son ", "leur "])
     return {
-        "sales":    wants_sales,
-        "products": wants_products,
-        "clients":  wants_clients,
-        "general":  not (wants_sales or wants_products or wants_clients),
+        "sales":        any(w in q for w in ["vente", "ventes", "chiffre", "prévision", "forecast", "revenu", "revenus", "mois", "mensuel", "croissance", "pourcentage", "ca ", "c.a"]),
+        "products":     any(w in q for w in ["produit", "produits", "article", "articles", "stock", "prix", "catalogue", "disponible", "populaire"]),
+        "clients":      any(w in q for w in ["client", "clients", "acheteur", "dépensé", "depensé", "trie", "montant", "email", "contact", "telephone", "adresse", "meilleur", "qui ", "son ", "leur "]),
+        "orders":       any(w in q for w in ["commande", "commandes", "livraison", "livré", "annulé", "confirmé", "brouillon", "en cours"]),
+        "invoices":     any(w in q for w in ["facture", "factures", "paiement", "paiements", "impayé", "retard", "réglé", "montant dû", "en attente"]),
+        "prospects":    any(w in q for w in ["prospect", "prospects", "lead", "leads", "pipeline", "converti", "qualifié", "nouveau prospect", "contacté"]),
+        "interactions": any(w in q for w in ["interaction", "interactions", "appel", "email envoyé", "réunion", "rendez-vous", "historique", "suivi"]),
+        "employees":    any(w in q for w in ["employé", "employés", "utilisateur", "utilisateurs", "vendeur", "vendeurs", "équipe", "performance"]),
     }
 
 
@@ -165,12 +166,7 @@ def _pipeline_sales():
         {"$sort": {"dateCommande": -1}},
         {"$limit": MAX_DOCS},
         {"$project": {
-            "month": {
-                "$dateTrunc": {
-                    "date": {"$toDate": "$dateCommande"},
-                    "unit": "month",
-                }
-            },
+            "month": {"$dateTrunc": {"date": {"$toDate": "$dateCommande"}, "unit": "month"}},
             "total": "$montantTotal",
         }},
         {"$group": {"_id": "$month", "total": {"$sum": "$total"}}},
@@ -189,26 +185,16 @@ def _pipeline_prod():
         {"$group": {"_id": "$produitId", "predicted_revenue": {"$sum": "$revenue"}}},
         {"$sort": {"predicted_revenue": -1}},
         {"$limit": 5},
-        {"$addFields": {
-            "produitIdObj": {
-                "$cond": {
-                    "if":   {"$eq": [{"$type": "$_id"}, "objectId"]},
-                    "then": "$_id",
-                    "else": {"$toObjectId": "$_id"},
-                }
-            }
-        }},
-        {"$lookup": {
-            "from":         "produits",
-            "localField":   "produitIdObj",
-            "foreignField": "_id",
-            "as":           "produit",
-        }},
+        {"$addFields": {"produitIdObj": {"$cond": {"if": {"$eq": [{"$type": "$_id"}, "objectId"]}, "then": "$_id", "else": {"$toObjectId": "$_id"}}}}},
+        {"$lookup": {"from": "produits", "localField": "produitIdObj", "foreignField": "_id", "as": "produit"}},
         {"$unwind": {"path": "$produit", "preserveNullAndEmptyArrays": True}},
         {"$project": {
             "predicted_revenue": 1,
             "nom":         {"$ifNull": ["$produit.nom", "Produit inconnu"]},
             "description": {"$ifNull": ["$produit.description", ""]},
+            "prix":        {"$ifNull": ["$produit.prix", 0]},
+            "stock":       {"$ifNull": ["$produit.stock", 0]},
+            "disponible":  {"$ifNull": ["$produit.disponible", False]},
         }},
     ]
 
@@ -217,38 +203,101 @@ def _pipeline_clients():
     return [
         {"$sort": {"dateCommande": -1}},
         {"$limit": MAX_DOCS},
-        {"$group": {
-            "_id":          "$clientId",
-            "total_spent":  {"$sum": "$montantTotal"},
-            "nb_commandes": {"$sum": 1},
-        }},
+        {"$group": {"_id": "$clientId", "total_spent": {"$sum": "$montantTotal"}, "nb_commandes": {"$sum": 1}}},
         {"$sort": {"total_spent": -1}},
         {"$limit": 10},
-        {"$addFields": {
-            "clientIdObj": {
-                "$cond": {
-                    "if":   {"$eq": [{"$type": "$_id"}, "objectId"]},
-                    "then": "$_id",
-                    "else": {"$toObjectId": "$_id"},
-                }
-            }
-        }},
-        {"$lookup": {
-            "from":         "clients",
-            "localField":   "clientIdObj",
-            "foreignField": "_id",
-            "as":           "client",
-        }},
+        {"$addFields": {"clientIdObj": {"$cond": {"if": {"$eq": [{"$type": "$_id"}, "objectId"]}, "then": "$_id", "else": {"$toObjectId": "$_id"}}}}},
+        {"$lookup": {"from": "clients", "localField": "clientIdObj", "foreignField": "_id", "as": "client"}},
         {"$unwind": {"path": "$client", "preserveNullAndEmptyArrays": True}},
         {"$project": {
-            "total_spent":  1,
-            "nb_commandes": 1,
+            "total_spent": 1, "nb_commandes": 1,
             "nom":       {"$ifNull": ["$client.nom", "Inconnu"]},
             "prenom":    {"$ifNull": ["$client.prenom", ""]},
             "email":     {"$ifNull": ["$client.email", ""]},
             "telephone": {"$ifNull": ["$client.telephone", ""]},
             "adresse":   {"$ifNull": ["$client.adresse", ""]},
+            "type":      {"$ifNull": ["$client.type", ""]},
         }},
+    ]
+
+
+def _pipeline_orders():
+    return [
+        {"$sort": {"dateCommande": -1}},
+        {"$limit": 50},
+        {"$addFields": {"clientIdObj": {"$cond": {"if": {"$eq": [{"$type": "$clientId"}, "objectId"]}, "then": "$clientId", "else": {"$toObjectId": "$clientId"}}}}},
+        {"$lookup": {"from": "clients", "localField": "clientIdObj", "foreignField": "_id", "as": "client"}},
+        {"$unwind": {"path": "$client", "preserveNullAndEmptyArrays": True}},
+        {"$project": {
+            "dateCommande": 1,
+            "statut":       1,
+            "montantTotal": 1,
+            "notes":        1,
+            "clientNom":    {"$ifNull": [{"$concat": ["$client.nom", " ", "$client.prenom"]}, "Inconnu"]},
+        }},
+    ]
+
+
+def _pipeline_invoices():
+    return [
+        {"$sort": {"dateEmission": -1}},
+        {"$limit": 50},
+        {"$addFields": {"clientIdObj": {"$cond": {"if": {"$eq": [{"$type": "$clientId"}, "objectId"]}, "then": "$clientId", "else": {"$toObjectId": "$clientId"}}}}},
+        {"$lookup": {"from": "clients", "localField": "clientIdObj", "foreignField": "_id", "as": "client"}},
+        {"$unwind": {"path": "$client", "preserveNullAndEmptyArrays": True}},
+        {"$project": {
+            "numeroFacture":  1,
+            "dateEmission":   1,
+            "montantTotal":   1,
+            "statutPaiement": 1,
+            "datePaiement":   1,
+            "clientNom":      {"$ifNull": [{"$concat": ["$client.nom", " ", "$client.prenom"]}, "Inconnu"]},
+        }},
+    ]
+
+
+def _pipeline_prospects():
+    return [
+        {"$sort": {"dateCreation": -1}},
+        {"$limit": 50},
+        {"$project": {
+            "nom":       1,
+            "prenom":    1,
+            "email":     1,
+            "telephone": 1,
+            "entreprise":1,
+            "statut":    1,
+        }},
+    ]
+
+
+def _pipeline_interactions():
+    return [
+        {"$sort": {"date": -1}},
+        {"$limit": 50},
+        {"$addFields": {"clientIdObj": {"$cond": {"if": {"$eq": [{"$type": "$clientId"}, "objectId"]}, "then": "$clientId", "else": {"$toObjectId": {"$ifNull": ["$clientId", "000000000000000000000000"]}}}}}},
+        {"$lookup": {"from": "clients", "localField": "clientIdObj", "foreignField": "_id", "as": "client"}},
+        {"$unwind": {"path": "$client", "preserveNullAndEmptyArrays": True}},
+        {"$project": {
+            "type":        1,
+            "description": 1,
+            "date":        1,
+            "clientNom":   {"$ifNull": [{"$concat": ["$client.nom", " ", "$client.prenom"]}, "Inconnu"]},
+        }},
+    ]
+
+
+def _pipeline_employees():
+    return [
+        {"$match": {"actif": True}},
+        {"$project": {
+            "nom":    1,
+            "prenom": 1,
+            "email":  1,
+            "role":   1,
+            "actif":  1,
+        }},
+        {"$limit": 50},
     ]
 
 
@@ -256,32 +305,10 @@ def _pipeline_clients():
 # Fallback formatter
 # ================================================================
 
-def _format_fallback(
-    question: str,
-    predictions: List[Dict],
-    top_prod: List[Dict],
-    top_clients: List[Dict],
-) -> str:
-    lines = [f"Voici les données disponibles pour : « {question} »\n"]
-    if predictions:
-        lines.append("**Prévisions de ventes :**")
-        for p in predictions[-3:]:
-            lines.append(f"- {str(p.get('month', ''))[:7]} : {p.get('predicted_sales', 0)} €")
-    if top_prod:
-        lines.append("\n**Top produits :**")
-        for i, p in enumerate(top_prod, 1):
-            lines.append(f"{i}. {p.get('nom', 'Inconnu')} — {p.get('predicted_revenue', 0)} €")
-    if top_clients:
-        lines.append("\n**Top clients :**")
-        for i, c in enumerate(top_clients, 1):
-            name = f"{c.get('nom', '')} {c.get('prenom', '')}".strip() or "Inconnu"
-            email = c.get("email", "")
-            lines.append(
-                f"{i}. {name} — {c.get('total_spent', 0)} €"
-                f" ({c.get('nb_commandes', 0)} commandes)"
-                f"{' — ' + email if email else ''}"
-            )
-    return "\n".join(lines)
+def _format_fallback(question: str, data_parts: List[str]) -> str:
+    if not data_parts:
+        return "Je suis là pour vous aider. Posez-moi une question sur vos données CRM/ERP."
+    return f"Voici les données disponibles pour : « {question} »\n\n" + "\n".join(data_parts)
 
 
 # ================================================================
@@ -312,8 +339,8 @@ async def sales_forecast(
         "Tu utilises les données fournies pour répondre précisément aux questions. "
         "Tu n'inventes jamais de données. "
         "Tu ne montres jamais d'identifiants techniques (ObjectId, _id). "
-        "Quand tu listes des clients, tu inclus toujours leur nom complet, email, "
-        "téléphone et montant dépensé si disponibles. "
+        "Quand tu listes des clients, tu inclus leur nom complet, email, téléphone et montant dépensé si disponibles. "
+        "Quand tu listes des factures, tu indiques le statut de paiement clairement. "
         "Si les données ne permettent pas de répondre, dis-le clairement."
     )
 
@@ -323,19 +350,24 @@ async def sales_forecast(
         for m in _strip_charts(history[-6:])
     )
     intent = _detect_intent(question, history_text)
+    is_general = not any([
+        intent["sales"], intent["products"], intent["clients"],
+        intent["orders"], intent["invoices"], intent["prospects"],
+        intent["interactions"], intent["employees"],
+    ])
 
     # ── 3. General question ────────────────────────────────────────
-    if intent["general"]:
+    if is_general:
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": question},
         ]
         answer = await _groq_call(messages)
         if not answer:
-            answer = "Je suis là pour vous aider. Posez-moi une question sur vos ventes, clients ou produits."
+            answer = "Je suis là pour vous aider. Posez-moi une question sur vos ventes, clients, factures, produits, prospects ou interactions."
         return {"answer": answer, "chart": None, "predictions": [], "top_products": [], "top_clients": []}
 
-    # ── 4. DB queries ──────────────────────────────────────────────
+    # ── 4. DB queries — only what's needed ────────────────────────
     tasks = {}
     if intent["sales"]:
         tasks["sales"] = db[CommandeModel.collection].aggregate(_pipeline_sales()).to_list(MAX_DOCS)
@@ -343,63 +375,134 @@ async def sales_forecast(
         tasks["products"] = db[LigneCommandeModel.collection].aggregate(_pipeline_prod()).to_list(5)
     if intent["clients"]:
         tasks["clients"] = db[CommandeModel.collection].aggregate(_pipeline_clients()).to_list(10)
+    if intent["orders"]:
+        tasks["orders"] = db[CommandeModel.collection].aggregate(_pipeline_orders()).to_list(50)
+    if intent["invoices"]:
+        tasks["invoices"] = db["factures"].aggregate(_pipeline_invoices()).to_list(50)
+    if intent["prospects"]:
+        tasks["prospects"] = db["prospects"].find({}, {"_id": 0}).to_list(50)
+    if intent["interactions"]:
+        tasks["interactions"] = db["interactions"].aggregate(_pipeline_interactions()).to_list(50)
+    if intent["employees"]:
+        tasks["employees"] = db["users"].aggregate(_pipeline_employees()).to_list(50)
 
     results = dict(zip(tasks.keys(), await asyncio.gather(*tasks.values())))
 
-    sales_raw   = results.get("sales", [])
-    prod_raw    = results.get("products", [])
-    clients_raw = results.get("clients", [])
-
+    # ── 5. Process results ─────────────────────────────────────────
     data_parts = []
     predictions_preview = []
     top_prod = []
     top_clients = []
 
-    if sales_raw:
-        df_sales = pd.DataFrame([{"month": d["_id"], "total": d["total"]} for d in sales_raw])
+    if results.get("sales"):
+        df_sales = pd.DataFrame([{"month": d["_id"], "total": d["total"]} for d in results["sales"]])
         forecast_df = forecast_sales(df_sales)
         predictions_preview = safe_records(forecast_df)
-        data_parts.append(f"Prévisions de ventes (mois, montant prédit): {predictions_preview}")
+        data_parts.append(f"Prévisions de ventes: {predictions_preview}")
 
-    if prod_raw:
+    if results.get("products"):
         top_prod = [
             {
-                "nom":               d.get("nom", "Produit inconnu"),
+                "nom":               d.get("nom", "Inconnu"),
                 "description":       d.get("description", ""),
-                "predicted_revenue": round(d["predicted_revenue"], 2),
+                "prix":              d.get("prix", 0),
+                "stock":             d.get("stock", 0),
+                "disponible":        d.get("disponible", False),
+                "predicted_revenue": round(d.get("predicted_revenue", 0), 2),
             }
-            for d in prod_raw
+            for d in results["products"]
         ]
-        data_parts.append(f"Top produits (nom, revenu): {top_prod}")
+        data_parts.append(f"Produits (nom, prix, stock, disponible, revenu): {top_prod}")
 
-    if clients_raw:
+    if results.get("clients"):
         top_clients = [
             {
-                "nom":          f"{d.get('nom', '')} {d.get('prenom', '')}".strip() or "Client inconnu",
+                "nom":          f"{d.get('nom', '')} {d.get('prenom', '')}".strip() or "Inconnu",
                 "email":        d.get("email", ""),
                 "telephone":    d.get("telephone", ""),
                 "adresse":      d.get("adresse", ""),
-                "total_spent":  round(d["total_spent"], 2),
+                "type":         d.get("type", ""),
+                "total_spent":  round(d.get("total_spent", 0), 2),
                 "nb_commandes": d.get("nb_commandes", 0),
             }
-            for d in clients_raw
+            for d in results["clients"]
         ]
-        data_parts.append(
-            f"Données clients complètes (nom, email, telephone, adresse, total_spent, nb_commandes): {top_clients}"
-        )
+        data_parts.append(f"Clients (nom, email, telephone, adresse, type, total_spent, nb_commandes): {top_clients}")
 
+    if results.get("orders"):
+        orders = [
+            {
+                "client":  d.get("clientNom", "Inconnu"),
+                "date":    str(d.get("dateCommande", ""))[:10],
+                "statut":  d.get("statut", ""),
+                "montant": d.get("montantTotal", 0),
+                "notes":   d.get("notes", ""),
+            }
+            for d in results["orders"]
+        ]
+        data_parts.append(f"Commandes récentes (client, date, statut, montant): {orders}")
+
+    if results.get("invoices"):
+        invoices = [
+            {
+                "numero":  d.get("numeroFacture", ""),
+                "client":  d.get("clientNom", "Inconnu"),
+                "date":    str(d.get("dateEmission", ""))[:10],
+                "montant": d.get("montantTotal", 0),
+                "statut":  d.get("statutPaiement", ""),
+                "payéLe":  str(d.get("datePaiement", ""))[:10] if d.get("datePaiement") else "Non payée",
+            }
+            for d in results["invoices"]
+        ]
+        data_parts.append(f"Factures (numero, client, date, montant, statut, payéLe): {invoices}")
+
+    if results.get("prospects"):
+        prospects = [
+            {
+                "nom":        f"{d.get('nom', '')} {d.get('prenom', '')}".strip(),
+                "email":      d.get("email", ""),
+                "telephone":  d.get("telephone", ""),
+                "entreprise": d.get("entreprise", ""),
+                "statut":     d.get("statut", ""),
+            }
+            for d in results["prospects"]
+        ]
+        data_parts.append(f"Prospects (nom, email, entreprise, statut): {prospects}")
+
+    if results.get("interactions"):
+        interactions = [
+            {
+                "type":        d.get("type", ""),
+                "client":      d.get("clientNom", "Inconnu"),
+                "date":        str(d.get("date", ""))[:10],
+                "description": d.get("description", "")[:200],
+            }
+            for d in results["interactions"]
+        ]
+        data_parts.append(f"Interactions récentes (type, client, date, description): {interactions}")
+
+    if results.get("employees"):
+        employees = [
+            {
+                "nom":    f"{d.get('nom', '')} {d.get('prenom', '')}".strip(),
+                "email":  d.get("email", ""),
+                "role":   d.get("role", ""),
+                "actif":  d.get("actif", False),
+            }
+            for d in results["employees"]
+        ]
+        data_parts.append(f"Employés (nom, email, role): {employees}")
+
+    # ── 6. Build prompt and call Groq ──────────────────────────────
     user_message_with_data = question
     if data_parts:
         user_message_with_data += "\n\nDonnées disponibles:\n" + "\n".join(data_parts)
 
     messages = _build_messages(history, system_prompt, user_message_with_data)
-
-    # ── 5. Groq call — no charts ───────────────────────────────────
     explanation = await _groq_call(messages)
 
-    # ── 6. Fallback ────────────────────────────────────────────────
     if not explanation:
-        explanation = _format_fallback(question, predictions_preview, top_prod, top_clients)
+        explanation = _format_fallback(question, data_parts)
 
     return {
         "answer":       explanation,

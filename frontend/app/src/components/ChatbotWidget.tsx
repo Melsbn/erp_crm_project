@@ -145,7 +145,6 @@ export function ChatbotWidget() {
     }
   };
 
-  const handleClear = () => setMessages(starterMessages);
 
   return (
     <>
@@ -170,12 +169,7 @@ export function ChatbotWidget() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <button
-                  onClick={handleClear}
-                  className="text-xs text-white/70 hover:text-white px-2 py-1 rounded hover:bg-white/10 transition-colors"
-                >
-                  Effacer
-                </button>
+
                 <button
                   onClick={() => setIsOpen(false)}
                   className="text-white/70 hover:text-white p-1 rounded hover:bg-white/10 transition-colors"
