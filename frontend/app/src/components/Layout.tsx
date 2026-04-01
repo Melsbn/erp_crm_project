@@ -21,25 +21,15 @@ import { useEffect } from 'react';
 import { useStore } from '@/store';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChatbotWidget } from '@/components/ChatbotWidget';
-
-
-const navigation = [
-  { name: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard, allowedRoles: ['ADMIN', 'SUPERVISEUR'] },
-  { name: 'Utilisateurs', href: '/users', icon: Users, allowedRoles: ['ADMIN', 'SUPERVISEUR'] },
-  { name: 'Clients', href: '/clients', icon: UserCircle, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
-  { name: 'Prospects', href: '/prospects', icon: UserPlus, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
-  { name: 'Produits', href: '/products', icon: Package, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
-  { name: 'Commandes', href: '/commandes', icon: ShoppingCart, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
-  { name: 'Factures', href: '/factures', icon: FileText, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
-  { name: 'Interactions', href: '/interactions', icon: MessageSquare, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
-  { name: 'Rapports', href: '/rapports', icon: BarChart3, allowedRoles: ['SUPERVISEUR'] },
-  { name: 'Supervision', href: '/supervision', icon: Shield, allowedRoles: ['SUPERVISEUR'] },
-];
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useTranslation } from 'react-i18next';
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { logout, user } = useAuth();
+  const { t } = useTranslation();
   
   // Add this block to fetch all data on app load
   const {
@@ -53,6 +43,19 @@ export function Layout() {
     fetchInteractions,
     fetchReports
   } = useStore();
+
+  const navigation = [
+    { name: t('navigation.dashboard'), href: '/dashboard', icon: LayoutDashboard, allowedRoles: ['ADMIN', 'SUPERVISEUR'] },
+    { name: t('navigation.users'), href: '/users', icon: Users, allowedRoles: ['ADMIN', 'SUPERVISEUR'] },
+    { name: t('navigation.clients'), href: '/clients', icon: UserCircle, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
+    { name: t('navigation.prospects'), href: '/prospects', icon: UserPlus, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
+    { name: t('navigation.products'), href: '/products', icon: Package, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
+    { name: t('navigation.orders'), href: '/commandes', icon: ShoppingCart, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
+    { name: t('navigation.invoices'), href: '/factures', icon: FileText, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
+    { name: t('navigation.interactions'), href: '/interactions', icon: MessageSquare, allowedRoles: ['ADMIN', 'SUPERVISEUR', 'EMPLOYE'] },
+    { name: t('navigation.reports'), href: '/rapports', icon: BarChart3, allowedRoles: ['SUPERVISEUR'] },
+    { name: t('navigation.supervision'), href: '/supervision', icon: Shield, allowedRoles: ['SUPERVISEUR'] },
+  ];
 
   const visibleNavigation = navigation.filter((item) =>
     user?.role ? item.allowedRoles.includes(user.role) : false
@@ -100,7 +103,7 @@ export function Layout() {
               <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">ERP</span>
               </div>
-              <span className="font-bold text-slate-800">CRM System</span>
+              <span className="font-bold text-slate-800">{t('layout.crmSystem')}</span>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
               <X className="w-5 h-5" />
@@ -133,7 +136,7 @@ export function Layout() {
                 onClick={logout}
               >
                 <LogOut className="w-5 h-5 mr-3" />
-                Logout
+                {t('layout.logout')}
               </Button>
             </div>
           </nav>
@@ -142,12 +145,12 @@ export function Layout() {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-1 bg-white border-r border-slate-200">
+        <div className="flex flex-col flex-1 bg-white border-r border-slate-200 dark:bg-slate-950 dark:border-slate-800">
           <div className="flex items-center gap-2 h-16 px-4 border-b border-slate-200">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">ERP</span>
             </div>
-            <span className="font-bold text-slate-800">Project</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100">{t('layout.project')}</span>
           </div>
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {visibleNavigation.map((item) => (
@@ -166,8 +169,8 @@ export function Layout() {
               </Link>
             ))}
           </nav>
-          <div className="p-4 border-t border-slate-200">
-            <div className="px-3 py-2 text-xs text-slate-500 truncate">
+          <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+            <div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 truncate">
               {user?.email}
             </div>
             <Button
@@ -176,7 +179,7 @@ export function Layout() {
               onClick={logout}
             >
               <LogOut className="w-5 h-5 mr-3" />
-              Logout
+              {t('layout.logout')}
             </Button>
           </div>
         </div>
@@ -184,17 +187,25 @@ export function Layout() {
 
       {/* Main content */}
       <div className="lg:pl-64">
+        <div className="hidden h-16 items-center justify-end gap-2 border-b border-slate-200 bg-white px-8 dark:border-slate-800 dark:bg-slate-950 lg:flex">
+          <LanguageSwitcher />
+          <ThemeToggle />
+        </div>
         {/* Mobile header */}
-        <div className="lg:hidden flex items-center justify-between h-16 px-4 bg-white border-b border-slate-200">
+        <div className="lg:hidden flex items-center justify-between h-16 px-4 bg-white border-b border-slate-200 dark:bg-slate-950 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">ERP</span>
             </div>
-            <span className="font-bold text-slate-800">Project</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100">{t('layout.project')}</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-            <Menu className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <ThemeToggle />
+            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
+              <Menu className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Page content */}

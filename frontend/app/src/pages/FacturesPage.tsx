@@ -1,5 +1,7 @@
 ﻿import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store';
+import type { Facture, LigneCommande } from '@/types';
 import { StatutPaiement, MethodePaiement } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +47,38 @@ const statutIcons = {
   [StatutPaiement.PARTIELLE]: AlertCircle,
 };
 
+type InvoicePdfLabels = {
+  companyName: string;
+  companyAddress: string;
+  companyContact: string;
+  invoiceBadge: string;
+  billedTo: string;
+  clientId: string;
+  issueDate: string;
+  status: string;
+  totalAmount: string;
+  amountPaid: string;
+  amountDue: string;
+  billedProducts: string;
+  product: string;
+  quantityShort: string;
+  unitPrice: string;
+  emptyProducts: string;
+  paymentHistory: string;
+  paymentMethod: string;
+  reference: string;
+  emptyPayments: string;
+  totalBeforeTax: string;
+  vat: string;
+  totalWithTax: string;
+  alreadyPaid: string;
+  balanceDue: string;
+  footerNote: string;
+  iban: string;
+  bic: string;
+  date: string;
+};
+
 // ─── Colour palette ───────────────────────────────────────────────────────────
 const C = {
   blue:   [37,  99,  235] as [number,number,number],
@@ -64,18 +98,17 @@ function statutColor(s: StatutPaiement): [number,number,number] {
   return C.amber;
 }
 
-function statutLabel(s: StatutPaiement): string {
-  if (s === StatutPaiement.PAYEE)      return 'PAYÉE';
-  if (s === StatutPaiement.PARTIELLE)  return 'PARTIELLE';
-  return 'EN ATTENTE';
-}
-
 // ─── PDF builder ──────────────────────────────────────────────────────────────
 function generateInvoicePdf(
-  facture: { id: string; numeroFacture: string; dateEmission: string; statutPaiement: StatutPaiement; montantTotal: number; clientId: string; lignes?: any[] },
+  facture: Facture,
   clientName: string,
+  lignes: Array<LigneCommande & { produitNom: string }>,
   paiements: Array<{ id: string; datePaiement: string; methode: string; reference: string; montant: number }>,
-  montantPaye: number
+  montantPaye: number,
+  labels: InvoicePdfLabels,
+  locale: string,
+  getPaymentMethodLabel: (method: string) => string,
+  getPaymentStatusLabel: (status: StatutPaiement) => string
 ) {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const PW = pdf.internal.pageSize.getWidth();   // 210
@@ -94,12 +127,12 @@ function generateInvoicePdf(
   pdf.setTextColor(...C.white);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(20);
-  pdf.text('VOTRE ENTREPRISE', M, 20);
+  pdf.text(labels.companyName, M, 20);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(8.5);
   pdf.setTextColor(186, 212, 255);
-  pdf.text('123 Rue de la Paix, 75001 Paris', M, 28);
-  pdf.text('contact@entreprise.fr  •  +33 1 00 00 00 00', M, 34);
+  pdf.text(labels.companyAddress, M, 28);
+  pdf.text(labels.companyContact, M, 34);
 
   // "FACTURE" badge (right)
   pdf.setFillColor(255, 255, 255, 0.12 as any);
@@ -107,7 +140,7 @@ function generateInvoicePdf(
   pdf.setTextColor(...C.white);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(14);
-  pdf.text('FACTURE', PW - M - 21, 22, { align: 'center' });
+  pdf.text(labels.invoiceBadge, PW - M - 21, 22, { align: 'center' });
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
   pdf.setTextColor(196, 215, 255);
@@ -121,7 +154,7 @@ function generateInvoicePdf(
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(7.5);
   pdf.setTextColor(...C.gray);
-  pdf.text('FACTURÉ À', M + 5, infoY + 8);
+  pdf.text(labels.billedTo, M + 5, infoY + 8);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(10);
   pdf.setTextColor(...C.dark);
@@ -129,7 +162,7 @@ function generateInvoicePdf(
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(8.5);
   pdf.setTextColor(...C.gray);
-  pdf.text(`ID client : ${facture.clientId.slice(0, 12)}`, M + 5, infoY + 25);
+  pdf.text(`${labels.clientId}: ${facture.clientId.slice(0, 12)}`, M + 5, infoY + 25);
 
   // Dates card
   const dateX = M + CW * 0.55 + 6;
@@ -138,8 +171,8 @@ function generateInvoicePdf(
   pdf.roundedRect(dateX, infoY, dateW, 36, 4, 4, 'F');
 
   const dateRows = [
-    ['Date d\'émission',  new Date(facture.dateEmission).toLocaleDateString('fr-FR')],
-    ['Statut',            statutLabel(facture.statutPaiement)],
+    [labels.issueDate,  new Date(facture.dateEmission).toLocaleDateString(locale)],
+    [labels.status,     getPaymentStatusLabel(facture.statutPaiement)],
   ];
   dateRows.forEach(([k, v], i) => {
     const dy = infoY + 10 + i * 12;
@@ -150,7 +183,7 @@ function generateInvoicePdf(
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8.5);
     // colour-code the status
-    if (k === 'Statut') {
+    if (k === labels.status) {
       pdf.setTextColor(...statutColor(facture.statutPaiement));
     } else {
       pdf.setTextColor(...C.dark);
@@ -163,9 +196,9 @@ function generateInvoicePdf(
   const cardW = (CW - 6) / 3;
 
   const summaryCards = [
-    { label: 'Montant total',  value: `${facture.montantTotal.toLocaleString('fr-FR')} €`, color: C.blue  },
-    { label: 'Montant payé',   value: `${montantPaye.toLocaleString('fr-FR')} €`,          color: C.green },
-    { label: 'Reste à payer',  value: `${montantRestant.toLocaleString('fr-FR')} €`,       color: isPaid ? C.green : C.red },
+    { label: labels.totalAmount, value: `${facture.montantTotal.toLocaleString(locale)} €`, color: C.blue },
+    { label: labels.amountPaid, value: `${montantPaye.toLocaleString(locale)} €`, color: C.green },
+    { label: labels.amountDue, value: `${montantRestant.toLocaleString(locale)} €`, color: isPaid ? C.green : C.red },
   ];
 
   summaryCards.forEach((card, i) => {
@@ -188,14 +221,84 @@ function generateInvoicePdf(
     pdf.text(card.value, cx + 7, sumY + 17);
   });
 
+  // ── Purchased products table ────────────────────────────────────────────────
+  const productsTitleY = sumY + 32;
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(10);
+  pdf.setTextColor(...C.dark);
+  pdf.text(labels.billedProducts, M, productsTitleY);
+  pdf.setDrawColor(...C.blue);
+  pdf.setLineWidth(1.5);
+  pdf.line(M, productsTitleY + 2, M + 38, productsTitleY + 2);
+  pdf.setLineWidth(0.3);
+
+  const productsStartY = productsTitleY + 8;
+  const productCols = [84, 22, 34, 38];
+  const productColX = [M, M + 84, M + 106, M + 140];
+  const productHeaders = [labels.product, labels.quantityShort, labels.unitPrice, labels.totalAmount];
+  const rowH = 8;
+
+  pdf.setFillColor(...C.blue);
+  pdf.rect(M, productsStartY, CW, rowH, 'F');
+  pdf.setTextColor(...C.white);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(7.5);
+  productHeaders.forEach((header, i) => {
+    const isRight = i > 0;
+    const tx = isRight ? productColX[i] + productCols[i] - 2 : productColX[i] + 2;
+    pdf.text(header, tx, productsStartY + 5.5, { align: isRight ? 'right' : 'left' });
+  });
+
+  let curY = productsStartY;
+
+  if (lignes.length === 0) {
+    curY += rowH;
+    pdf.setFillColor(...C.light);
+    pdf.rect(M, curY, CW, rowH, 'F');
+    pdf.setTextColor(...C.gray);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.text(labels.emptyProducts, M + CW / 2, curY + 5.5, { align: 'center' });
+    curY += rowH;
+  } else {
+    lignes.forEach((ligne, index) => {
+      curY += rowH;
+      pdf.setFillColor(...(index % 2 === 0 ? C.light : C.white));
+      pdf.rect(M, curY, CW, rowH, 'F');
+
+      const cells = [
+        ligne.produitNom,
+        String(ligne.quantite),
+        `${ligne.prixUnitaire.toLocaleString(locale)} €`,
+        `${ligne.sousTotal.toLocaleString(locale)} €`,
+      ];
+
+      pdf.setTextColor(...C.dark);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      cells.forEach((cell, i) => {
+        const isRight = i > 0;
+        const tx = isRight ? productColX[i] + productCols[i] - 2 : productColX[i] + 2;
+        const maxChars = i === 0 ? 40 : 14;
+        const text = cell.length > maxChars ? `${cell.slice(0, maxChars - 1)}…` : cell;
+        pdf.text(text, tx, curY + 5.5, { align: isRight ? 'right' : 'left' });
+      });
+    });
+    curY += rowH;
+  }
+
+  pdf.setDrawColor(...C.border);
+  pdf.setLineWidth(0.2);
+  pdf.rect(M, productsStartY, CW, curY - productsStartY, 'S');
+
   // ── Payment history table ────────────────────────────────────────────────────
-  const tableStartY = sumY + 32;
+  const tableStartY = curY + 10;
 
   // Section title
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(10);
   pdf.setTextColor(...C.dark);
-  pdf.text('Historique des paiements', M, tableStartY);
+  pdf.text(labels.paymentHistory, M, tableStartY);
   pdf.setDrawColor(...C.blue);
   pdf.setLineWidth(1.5);
   pdf.line(M, tableStartY + 2, M + 50, tableStartY + 2);
@@ -204,9 +307,7 @@ function generateInvoicePdf(
   const tY = tableStartY + 8;
   const cols = [40, 40, 60, 38]; // widths: date, méthode, référence, montant
   const colX = [M, M + 40, M + 80, M + 140];
-  const headers = ['Date', 'Méthode', 'Référence', 'Montant'];
-  const rowH = 8;
-
+  const headers = [labels.date, labels.paymentMethod, labels.reference, labels.totalAmount];
   // Header row
   pdf.setFillColor(...C.blue);
   pdf.rect(M, tY, CW, rowH, 'F');
@@ -219,7 +320,7 @@ function generateInvoicePdf(
     pdf.text(h, tx, tY + 5.5, { align });
   });
 
-  let curY = tY;
+  curY = tY;
 
   if (paiements.length === 0) {
     curY += rowH;
@@ -228,7 +329,7 @@ function generateInvoicePdf(
     pdf.setTextColor(...C.gray);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8);
-    pdf.text('Aucun paiement enregistré', M + CW / 2, curY + 5.5, { align: 'center' });
+    pdf.text(labels.emptyPayments, M + CW / 2, curY + 5.5, { align: 'center' });
     curY += rowH;
   } else {
     paiements.forEach((p, ri) => {
@@ -238,10 +339,10 @@ function generateInvoicePdf(
       pdf.rect(M, curY, CW, rowH, 'F');
 
       const cells = [
-        new Date(p.datePaiement).toLocaleDateString('fr-FR'),
-        p.methode,
+        new Date(p.datePaiement).toLocaleDateString(locale),
+        getPaymentMethodLabel(p.methode),
         p.reference || '—',
-        `${p.montant.toLocaleString('fr-FR')} €`,
+        `${p.montant.toLocaleString(locale)} €`,
       ];
 
       pdf.setTextColor(...C.dark);
@@ -275,11 +376,11 @@ function generateInvoicePdf(
   pdf.roundedRect(totX, totY, totW, 40, 4, 4, 'S');
 
   const totRows = [
-    { label: 'Total HT',      value: `${(facture.montantTotal * 0.8).toFixed(2)} €`,  bold: false },
-    { label: 'TVA (20%)',     value: `${(facture.montantTotal * 0.2).toFixed(2)} €`,  bold: false },
-    { label: 'Total TTC',     value: `${facture.montantTotal.toFixed(2)} €`,           bold: true  },
-    { label: 'Déjà réglé',   value: `${montantPaye.toFixed(2)} €`,                    bold: false },
-    { label: 'Solde restant', value: `${montantRestant.toFixed(2)} €`,                 bold: true  },
+    { label: labels.totalBeforeTax, value: `${(facture.montantTotal * 0.8).toFixed(2)} €`, bold: false },
+    { label: labels.vat, value: `${(facture.montantTotal * 0.2).toFixed(2)} €`, bold: false },
+    { label: labels.totalWithTax, value: `${facture.montantTotal.toFixed(2)} €`, bold: true },
+    { label: labels.alreadyPaid, value: `${montantPaye.toFixed(2)} €`, bold: false },
+    { label: labels.balanceDue, value: `${montantRestant.toFixed(2)} €`, bold: true },
   ];
 
   totRows.forEach((row, i) => {
@@ -305,8 +406,8 @@ function generateInvoicePdf(
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(7.5);
   pdf.setTextColor(...C.gray);
-  pdf.text('Merci pour votre confiance. Paiement à 30 jours par virement bancaire.', M, PH - 14);
-  pdf.text(`IBAN : FR76 0000 0000 0000 0000 0000 000  •  BIC : XXXXXXXX`, M, PH - 9);
+  pdf.text(labels.footerNote, M, PH - 14);
+  pdf.text(`${labels.iban}: FR76 0000 0000 0000 0000 0000 000  •  ${labels.bic}: XXXXXXXX`, M, PH - 9);
   pdf.text(facture.numeroFacture, PW - M, PH - 9, { align: 'right' });
 
   pdf.save(`${facture.numeroFacture}.pdf`);
@@ -315,7 +416,9 @@ function generateInvoicePdf(
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function FacturesPage() {
-  const { factures, clients, paiements, addPaiement, updateFacture, sendInvoiceReminder } = useStore();
+  const { t, i18n } = useTranslation();
+  const { factures, clients, produits, lignesCommande, paiements, addPaiement, updateFacture, sendInvoiceReminder } = useStore();
+  const locale = i18n.language.startsWith('fr') ? 'fr-FR' : 'en-US';
   const [searchTerm, setSearchTerm] = useState('');
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isPaiementDialogOpen, setIsPaiementDialogOpen] = useState(false);
@@ -329,6 +432,21 @@ export function FacturesPage() {
     reference: '',
   });
 
+  const getPaymentStatusLabel = (status: StatutPaiement) => t(`statusLabels.payment.${status}`);
+
+  const getPaymentMethodLabel = (method: string) => {
+    switch (method) {
+      case MethodePaiement.CARTE:
+        return t('pages.invoices.paymentMethods.card');
+      case MethodePaiement.VIREMENT:
+        return t('pages.invoices.paymentMethods.transfer');
+      case MethodePaiement.ESPECES:
+        return t('pages.invoices.paymentMethods.cash');
+      default:
+        return method;
+    }
+  };
+
   const filteredFactures = factures.filter(
     (facture) =>
       facture.numeroFacture.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -337,7 +455,7 @@ export function FacturesPage() {
 
   function getClientName(id: string) {
     const client = clients.find((c) => c.id === id);
-    return client ? `${client.prenom} ${client.nom}` : 'Client inconnu';
+    return client ? `${client.prenom} ${client.nom}` : t('common.unknownClient');
   }
 
   const getPaiementsForFacture = (factureId: string) =>
@@ -345,6 +463,20 @@ export function FacturesPage() {
 
   const getMontantPaye = (factureId: string) =>
     getPaiementsForFacture(factureId).reduce((sum, p) => sum + p.montant, 0);
+
+  const getFactureLignes = (factureId: string) => {
+    const facture = factures.find((item) => item.id === factureId);
+    if (!facture) {
+      return [];
+    }
+
+    return lignesCommande
+      .filter((ligne) => ligne.commandeId === facture.commandeId)
+      .map((ligne) => ({
+        ...ligne,
+        produitNom: produits.find((produit) => produit.id === ligne.produitId)?.nom || t('common.unknownProduct'),
+      }));
+  };
 
   const handleAddPaiement = async () => {
     if (!selectedFacture) return;
@@ -366,9 +498,9 @@ export function FacturesPage() {
       });
       setIsPaiementDialogOpen(false);
       setPaiementForm({ montant: 0, methode: MethodePaiement.VIREMENT, reference: '' });
-      toast.success('Paiement enregistré avec succès');
+      toast.success(t('pages.invoices.paymentSuccess'));
     } catch {
-      toast.error("Échec d'enregistrement du paiement");
+      toast.error(t('pages.invoices.paymentError'));
     }
   };
 
@@ -390,13 +522,48 @@ export function FacturesPage() {
       generateInvoicePdf(
         facture,
         getClientName(facture.clientId),
+        getFactureLignes(facture.id),
         getPaiementsForFacture(facture.id),
-        getMontantPaye(facture.id)
+        getMontantPaye(facture.id),
+        {
+          companyName: t('pages.invoices.pdf.companyName'),
+          companyAddress: t('pages.invoices.pdf.companyAddress'),
+          companyContact: t('pages.invoices.pdf.companyContact'),
+          invoiceBadge: t('navigation.invoices'),
+          billedTo: t('pages.invoices.pdf.billedTo'),
+          clientId: t('pages.invoices.pdf.clientId'),
+          issueDate: t('pages.invoices.issueDate'),
+          status: t('common.status'),
+          totalAmount: t('pages.invoices.totalAmount'),
+          amountPaid: t('pages.invoices.pdf.amountPaidCard'),
+          amountDue: t('pages.invoices.pdf.amountDueCard'),
+          billedProducts: t('pages.invoices.billedProducts'),
+          product: t('pages.invoices.product'),
+          quantityShort: t('common.quantityShort'),
+          unitPrice: t('common.unitPrice'),
+          emptyProducts: t('pages.invoices.pdf.emptyProducts'),
+          paymentHistory: t('pages.invoices.paymentHistory'),
+          paymentMethod: t('pages.invoices.paymentMethod'),
+          reference: t('pages.invoices.reference'),
+          emptyPayments: t('pages.invoices.noPayments'),
+          totalBeforeTax: t('pages.invoices.pdf.totalBeforeTax'),
+          vat: t('pages.invoices.pdf.vat'),
+          totalWithTax: t('pages.invoices.pdf.totalWithTax'),
+          alreadyPaid: t('pages.invoices.pdf.alreadyPaid'),
+          balanceDue: t('pages.invoices.pdf.balanceDue'),
+          footerNote: t('pages.invoices.pdf.footerNote'),
+          iban: t('pages.invoices.pdf.iban'),
+          bic: t('pages.invoices.pdf.bic'),
+          date: t('common.date'),
+        },
+        locale,
+        getPaymentMethodLabel,
+        getPaymentStatusLabel
       );
-      toast.success('Facture PDF téléchargée');
+      toast.success(t('pages.invoices.downloadSuccess'));
     } catch (err) {
       console.error(err);
-      toast.error('Échec du téléchargement');
+      toast.error(t('pages.invoices.downloadError'));
     } finally {
       setDownloadingId(null);
     }
@@ -406,9 +573,9 @@ export function FacturesPage() {
     setRemindingId(facture.id);
     try {
       await sendInvoiceReminder(facture.id);
-      toast.success('Email de rappel envoyé au client');
+      toast.success(t('pages.invoices.reminderSuccess'));
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Échec d'envoi de l'email de rappel";
+      const message = err instanceof Error ? err.message : t('pages.invoices.reminderError');
       toast.error(message);
     } finally {
       setRemindingId(null);
@@ -427,8 +594,8 @@ export function FacturesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Gestion des factures</h1>
-          <p className="text-slate-500">Suivez les factures et les paiements</p>
+          <h1 className="text-2xl font-bold text-slate-800">{t('pages.invoices.title')}</h1>
+          <p className="text-slate-500">{t('pages.invoices.subtitle')}</p>
         </div>
       </div>
 
@@ -441,7 +608,7 @@ export function FacturesPage() {
                 <FileText className="w-5 h-5 text-slate-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Total factures</p>
+                <p className="text-sm text-slate-500">{t('pages.invoices.totalInvoices')}</p>
                 <p className="text-xl font-bold">{stats.total}</p>
               </div>
             </div>
@@ -454,7 +621,7 @@ export function FacturesPage() {
                 <Clock className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">En attente</p>
+                <p className="text-sm text-slate-500">{t('pages.invoices.pending')}</p>
                 <p className="text-xl font-bold">{stats.enAttente}</p>
               </div>
             </div>
@@ -467,7 +634,7 @@ export function FacturesPage() {
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Payées</p>
+                <p className="text-sm text-slate-500">{t('pages.invoices.paid')}</p>
                 <p className="text-xl font-bold">{stats.payee}</p>
               </div>
             </div>
@@ -480,8 +647,8 @@ export function FacturesPage() {
                 <CreditCard className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Montant total</p>
-                <p className="text-xl font-bold">{stats.montantTotal.toLocaleString('fr-FR')} €</p>
+                <p className="text-sm text-slate-500">{t('pages.invoices.totalAmount')}</p>
+                <p className="text-xl font-bold">{stats.montantTotal.toLocaleString(locale)} €</p>
               </div>
             </div>
           </CardContent>
@@ -494,7 +661,7 @@ export function FacturesPage() {
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Rechercher une facture..."
+                placeholder={t('pages.invoices.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -506,12 +673,12 @@ export function FacturesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>N° Facture</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Date d'émission</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Montant</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t('pages.invoices.invoiceNumber')}</TableHead>
+                <TableHead>{t('common.client')}</TableHead>
+                <TableHead>{t('pages.invoices.issueDate')}</TableHead>
+                <TableHead>{t('common.status')}</TableHead>
+                <TableHead className="text-right">{t('common.amount')}</TableHead>
+                <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -527,21 +694,21 @@ export function FacturesPage() {
                     <TableCell className="font-medium">{facture.numeroFacture}</TableCell>
                     <TableCell>{getClientName(facture.clientId)}</TableCell>
                     <TableCell>
-                      {new Date(facture.dateEmission).toLocaleDateString('fr-FR')}
+                      {new Date(facture.dateEmission).toLocaleDateString(locale)}
                     </TableCell>
                     <TableCell>
                       <Badge className={statutColors[facture.statutPaiement]}>
                         <Icon className="w-3 h-3 mr-1" />
-                        {facture.statutPaiement}
+                        {getPaymentStatusLabel(facture.statutPaiement)}
                       </Badge>
                       {facture.statutPaiement !== StatutPaiement.PAYEE && (
                         <span className="text-xs text-slate-500 block mt-1">
-                          Reste: {montantRestant.toLocaleString('fr-FR')} €
+                          {t('pages.invoices.remaining')}: {montantRestant.toLocaleString(locale)} €
                         </span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {facture.montantTotal.toLocaleString('fr-FR')} €
+                      {facture.montantTotal.toLocaleString(locale)} €
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -565,7 +732,7 @@ export function FacturesPage() {
                             ) : (
                               <Mail className="w-4 h-4 mr-1" />
                             )}
-                            Relancer
+                            {t('pages.invoices.remind')}
                           </Button>
                         )}
                         {facture.statutPaiement !== StatutPaiement.PAYEE && (
@@ -576,7 +743,7 @@ export function FacturesPage() {
                             onClick={() => openPaiementDialog(facture)}
                           >
                             <CreditCard className="w-4 h-4 mr-1" />
-                            Payer
+                            {t('pages.invoices.pay')}
                           </Button>
                         )}
                         <Button
@@ -584,7 +751,7 @@ export function FacturesPage() {
                           size="icon"
                           onClick={() => handleDownloadInvoice(facture)}
                           disabled={isDownloading}
-                          aria-label={`Télécharger ${facture.numeroFacture}`}
+                          aria-label={t('pages.invoices.downloadLabel', { invoice: facture.numeroFacture })}
                         >
                           {isDownloading ? (
                             <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -606,79 +773,107 @@ export function FacturesPage() {
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Facture {selectedFacture?.numeroFacture}</DialogTitle>
-            <DialogDescription>Détails de la facture</DialogDescription>
+            <DialogTitle>{t('navigation.invoices')} {selectedFacture?.numeroFacture}</DialogTitle>
+            <DialogDescription>{t('pages.invoices.invoiceDetails')}</DialogDescription>
           </DialogHeader>
           {selectedFacture && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-slate-500">Client</Label>
+                  <Label className="text-slate-500">{t('common.client')}</Label>
                   <p className="font-medium">{getClientName(selectedFacture.clientId)}</p>
                 </div>
                 <div>
-                  <Label className="text-slate-500">Date d'émission</Label>
+                  <Label className="text-slate-500">{t('pages.invoices.issueDate')}</Label>
                   <p className="font-medium">
-                    {new Date(selectedFacture.dateEmission).toLocaleDateString('fr-FR')}
+                    {new Date(selectedFacture.dateEmission).toLocaleDateString(locale)}
                   </p>
                 </div>
                 <div>
-                  <Label className="text-slate-500">Statut</Label>
+                  <Label className="text-slate-500">{t('common.status')}</Label>
                   <p>
                     <Badge className={statutColors[selectedFacture.statutPaiement]}>
-                      {selectedFacture.statutPaiement}
+                      {getPaymentStatusLabel(selectedFacture.statutPaiement)}
                     </Badge>
                   </p>
                 </div>
                 <div>
-                  <Label className="text-slate-500">Montant total</Label>
+                  <Label className="text-slate-500">{t('pages.invoices.totalAmount')}</Label>
                   <p className="font-medium text-lg">
-                    {selectedFacture.montantTotal.toLocaleString('fr-FR')} €
+                    {selectedFacture.montantTotal.toLocaleString(locale)} €
                   </p>
                 </div>
               </div>
 
               <div>
-                <Label className="text-slate-500">Historique des paiements</Label>
+                <Label className="text-slate-500">{t('pages.invoices.billedProducts')}</Label>
+                {getFactureLignes(selectedFacture.id).length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('pages.invoices.product')}</TableHead>
+                        <TableHead className="text-right">{t('common.quantityShort')}</TableHead>
+                        <TableHead className="text-right">{t('common.unitPrice')}</TableHead>
+                        <TableHead className="text-right">{t('common.total')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {getFactureLignes(selectedFacture.id).map((ligne) => (
+                        <TableRow key={ligne.id}>
+                          <TableCell>{ligne.produitNom}</TableCell>
+                          <TableCell className="text-right">{ligne.quantite}</TableCell>
+                          <TableCell className="text-right">{ligne.prixUnitaire.toLocaleString(locale)} €</TableCell>
+                          <TableCell className="text-right">{ligne.sousTotal.toLocaleString(locale)} €</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-slate-500 text-sm py-4">{t('pages.invoices.noProducts')}</p>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-slate-500">{t('pages.invoices.paymentHistory')}</Label>
                 {getPaiementsForFacture(selectedFacture.id).length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Méthode</TableHead>
-                        <TableHead>Référence</TableHead>
-                        <TableHead className="text-right">Montant</TableHead>
+                        <TableHead>{t('common.date')}</TableHead>
+                        <TableHead>{t('pages.invoices.paymentMethod')}</TableHead>
+                        <TableHead>{t('pages.invoices.reference')}</TableHead>
+                        <TableHead className="text-right">{t('common.amount')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {getPaiementsForFacture(selectedFacture.id).map((paiement) => (
                         <TableRow key={paiement.id}>
                           <TableCell>
-                            {new Date(paiement.datePaiement).toLocaleDateString('fr-FR')}
+                            {new Date(paiement.datePaiement).toLocaleDateString(locale)}
                           </TableCell>
-                          <TableCell>{paiement.methode}</TableCell>
+                          <TableCell>{getPaymentMethodLabel(paiement.methode)}</TableCell>
                           <TableCell>{paiement.reference}</TableCell>
                           <TableCell className="text-right">
-                            {paiement.montant.toLocaleString('fr-FR')} €
+                            {paiement.montant.toLocaleString(locale)} €
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 ) : (
-                  <p className="text-slate-500 text-sm py-4">Aucun paiement enregistré</p>
+                  <p className="text-slate-500 text-sm py-4">{t('pages.invoices.noPayments')}</p>
                 )}
               </div>
 
               <div className="bg-slate-50 p-4 rounded-lg">
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">Montant payé:</span>
-                  <span>{getMontantPaye(selectedFacture.id).toLocaleString('fr-FR')} €</span>
+                  <span className="font-medium">{t('pages.invoices.paidAmount')}</span>
+                  <span>{getMontantPaye(selectedFacture.id).toLocaleString(locale)} €</span>
                 </div>
                 <div className="flex justify-between items-center mt-2">
-                  <span className="font-medium">Reste à payer:</span>
+                  <span className="font-medium">{t('pages.invoices.amountDue')}</span>
                   <span className="text-lg font-bold">
-                    {(selectedFacture.montantTotal - getMontantPaye(selectedFacture.id)).toLocaleString('fr-FR')} €
+                    {(selectedFacture.montantTotal - getMontantPaye(selectedFacture.id)).toLocaleString(locale)} €
                   </span>
                 </div>
               </div>
@@ -690,7 +885,7 @@ export function FacturesPage() {
                   className="gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Télécharger en PDF
+                  {t('common.downloadPdf')}
                 </Button>
               </div>
             </div>
@@ -702,21 +897,19 @@ export function FacturesPage() {
       <Dialog open={isPaiementDialogOpen} onOpenChange={setIsPaiementDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Enregistrer un paiement</DialogTitle>
+            <DialogTitle>{t('pages.invoices.recordPayment')}</DialogTitle>
             <DialogDescription>
               {selectedFacture && (
-                <>
-                  Facture {selectedFacture.numeroFacture} — Reste à payer :{' '}
-                  <strong>
-                    {(selectedFacture.montantTotal - getMontantPaye(selectedFacture.id)).toLocaleString('fr-FR')} €
-                  </strong>
-                </>
+                t('pages.invoices.paymentDialogDescription', {
+                  invoice: selectedFacture.numeroFacture,
+                  amount: `${(selectedFacture.montantTotal - getMontantPaye(selectedFacture.id)).toLocaleString(locale)} €`,
+                })
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="montant">Montant (€)</Label>
+              <Label htmlFor="montant">{t('pages.invoices.amountField')}</Label>
               <Input
                 id="montant"
                 type="number"
@@ -725,34 +918,34 @@ export function FacturesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="methode">Méthode de paiement</Label>
+              <Label htmlFor="methode">{t('pages.invoices.paymentMethod')}</Label>
               <Select
                 value={paiementForm.methode}
                 onValueChange={(value) => setPaiementForm({ ...paiementForm, methode: value as MethodePaiement })}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="CARTE">Carte bancaire</SelectItem>
-                  <SelectItem value="VIREMENT">Virement</SelectItem>
-                  <SelectItem value="ESPECES">Espèces</SelectItem>
+                  <SelectItem value="CARTE">{t('pages.invoices.paymentMethods.card')}</SelectItem>
+                  <SelectItem value="VIREMENT">{t('pages.invoices.paymentMethods.transfer')}</SelectItem>
+                  <SelectItem value="ESPECES">{t('pages.invoices.paymentMethods.cash')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="reference">Référence</Label>
+              <Label htmlFor="reference">{t('pages.invoices.reference')}</Label>
               <Input
                 id="reference"
                 value={paiementForm.reference}
                 onChange={(e) => setPaiementForm({ ...paiementForm, reference: e.target.value })}
-                placeholder="Numéro de transaction..."
+                placeholder={t('pages.invoices.transactionNumber')}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPaiementDialogOpen(false)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setIsPaiementDialogOpen(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleAddPaiement} className="bg-green-600 hover:bg-green-700">
               <CreditCard className="w-4 h-4 mr-2" />
-              Enregistrer le paiement
+              {t('pages.invoices.recordPayment')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -33,6 +33,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Phone, Mail, Calendar, Trash2, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const typeColors: Record<InteractionType, string> = {
   [InteractionType.APPEL]: 'bg-blue-100 text-blue-700',
@@ -47,6 +48,7 @@ const typeIcons = {
 };
 
 export function InteractionsPage() {
+  const { t } = useTranslation();
   const { interactions, clients, prospects, users, addInteraction, deleteInteraction } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -68,23 +70,23 @@ export function InteractionsPage() {
   const getContactName = (interaction: typeof interactions[0]) => {
     if (interaction.clientId) {
       const client = clients.find((c) => c.id === interaction.clientId);
-      return client ? `${client.prenom} ${client.nom}` : 'Client inconnu';
+      return client ? `${client.prenom} ${client.nom}` : t('pages.interactions.clientUnknown');
     }
     if (interaction.prospecId) {
       const prospec = prospects.find((p) => p.id === interaction.prospecId);
-      return prospec ? `${prospec.prenom} ${prospec.nom}` : 'Prospect inconnu';
+      return prospec ? `${prospec.prenom} ${prospec.nom}` : t('pages.interactions.prospectUnknown');
     }
-    return 'Contact inconnu';
+    return t('pages.interactions.contactUnknown');
   };
 
   const getUserName = (userId: string) => {
     const user = users.find((u) => u.id === userId);
-    return user ? `${user.prenom} ${user.nom}` : 'Utilisateur inconnu';
+    return user ? `${user.prenom} ${user.nom}` : t('pages.interactions.userUnknown');
   };
 
   const handleAdd = async () => {
     if (!formData.description) {
-      toast.error('Veuillez saisir une description');
+      toast.error(t('pages.interactions.noDescription'));
       return;
     }
 
@@ -106,19 +108,19 @@ export function InteractionsPage() {
         clientId: '',
         prospecId: '',
       });
-      toast.success('Interaction enregistrée avec succès');
+      toast.success(t('pages.interactions.createSuccess'));
     } catch {
-      toast.error("Échec d'enregistrement de l'interaction");
+      toast.error(t('pages.interactions.createError'));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette interaction ?')) {
+    if (confirm(t('pages.interactions.deleteConfirm'))) {
       try {
         await deleteInteraction(id);
-        toast.success('Interaction supprimée avec succès');
+        toast.success(t('pages.interactions.deleteSuccess'));
       } catch {
-        toast.error("Échec de suppression de l'interaction");
+        toast.error(t('pages.interactions.deleteError'));
       }
     }
   };
@@ -134,26 +136,24 @@ export function InteractionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Gestion des interactions</h1>
-          <p className="text-slate-500">Suivez les communications avec vos clients et prospects</p>
+          <h1 className="text-2xl font-bold text-slate-800">{t('pages.interactions.title')}</h1>
+          <p className="text-slate-500">{t('pages.interactions.subtitle')}</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
               <Plus className="w-4 h-4 mr-2" />
-              Nouvelle interaction
+              {t('pages.interactions.new')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Enregistrer une interaction</DialogTitle>
-              <DialogDescription>
-                Ajoutez une nouvelle interaction avec un client ou prospect
-              </DialogDescription>
+              <DialogTitle>{t('pages.interactions.createTitle')}</DialogTitle>
+              <DialogDescription>{t('pages.interactions.createDescription')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="type">Type d'interaction</Label>
+                <Label htmlFor="type">{t('pages.interactions.interactionType')}</Label>
                 <Select
                   value={formData.type}
                   onValueChange={(value) => setFormData({ ...formData, type: value as InteractionType })}
@@ -162,15 +162,15 @@ export function InteractionsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="APPEL">Appel téléphonique</SelectItem>
-                    <SelectItem value="EMAIL">Email</SelectItem>
-                    <SelectItem value="REUNION">Réunion</SelectItem>
+                    <SelectItem value="APPEL">{t('statusLabels.interaction.APPEL')}</SelectItem>
+                    <SelectItem value="EMAIL">{t('statusLabels.interaction.EMAIL')}</SelectItem>
+                    <SelectItem value="REUNION">{t('statusLabels.interaction.REUNION')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contact">Contact</Label>
+                <Label htmlFor="contact">{t('pages.interactions.contact')}</Label>
                 <Select
                   value={formData.clientId ? `client:${formData.clientId}` : formData.prospecId ? `prospec:${formData.prospecId}` : undefined}
                   onValueChange={(value) => {
@@ -183,16 +183,16 @@ export function InteractionsPage() {
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un contact" />
+                    <SelectValue placeholder={t('pages.interactions.selectContact')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="label-clients" disabled>Clients</SelectItem>
+                    <SelectItem value="label-clients" disabled>{t('pages.interactions.clientsLabel')}</SelectItem>
                     {clients.map((client) => (
                       <SelectItem key={client.id} value={`client:${client.id}`}>
                         {client.prenom} {client.nom}
                       </SelectItem>
                     ))}
-                    <SelectItem value="label-prospects" disabled>Prospects</SelectItem>
+                    <SelectItem value="label-prospects" disabled>{t('pages.interactions.prospectsLabel')}</SelectItem>
                     {prospects.map((prospec) => (
                       <SelectItem key={prospec.id} value={`prospec:${prospec.id}`}>
                         {prospec.prenom} {prospec.nom}
@@ -203,7 +203,7 @@ export function InteractionsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="date">Date</Label>
+                <Label htmlFor="date">{t('common.date')}</Label>
                 <Input
                   id="date"
                   type="date"
@@ -213,22 +213,22 @@ export function InteractionsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">{t('common.description')}</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Détails de l'interaction..."
+                  placeholder={t('pages.interactions.detailsPlaceholder')}
                   rows={4}
                 />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700">
-                Enregistrer
+                {t('common.save')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -244,7 +244,7 @@ export function InteractionsPage() {
                 <MessageSquare className="w-5 h-5 text-slate-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Total interactions</p>
+                <p className="text-sm text-slate-500">{t('pages.interactions.totalInteractions')}</p>
                 <p className="text-xl font-bold">{stats.total}</p>
               </div>
             </div>
@@ -257,7 +257,7 @@ export function InteractionsPage() {
                 <Phone className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Appels</p>
+                <p className="text-sm text-slate-500">{t('pages.interactions.calls')}</p>
                 <p className="text-xl font-bold">{stats.appel}</p>
               </div>
             </div>
@@ -270,7 +270,7 @@ export function InteractionsPage() {
                 <Mail className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Emails</p>
+                <p className="text-sm text-slate-500">{t('statusLabels.interaction.EMAIL')}</p>
                 <p className="text-xl font-bold">{stats.email}</p>
               </div>
             </div>
@@ -283,7 +283,7 @@ export function InteractionsPage() {
                 <Calendar className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Réunions</p>
+                <p className="text-sm text-slate-500">{t('pages.interactions.meetings')}</p>
                 <p className="text-xl font-bold">{stats.reunion}</p>
               </div>
             </div>
@@ -297,7 +297,7 @@ export function InteractionsPage() {
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Rechercher une interaction..."
+                placeholder={t('pages.interactions.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -309,12 +309,12 @@ export function InteractionsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Par</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t('common.type')}</TableHead>
+                <TableHead>{t('pages.interactions.contact')}</TableHead>
+                <TableHead>{t('common.description')}</TableHead>
+                <TableHead>{t('common.date')}</TableHead>
+                <TableHead>{t('pages.interactions.by')}</TableHead>
+                <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -325,7 +325,7 @@ export function InteractionsPage() {
                     <TableCell>
                       <Badge className={typeColors[interaction.type]}>
                         <Icon className="w-3 h-3 mr-1" />
-                        {interaction.type}
+                        {t(`statusLabels.interaction.${interaction.type}`)}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-medium">{getContactName(interaction)}</TableCell>
@@ -354,5 +354,4 @@ export function InteractionsPage() {
     </div>
   );
 }
-
 

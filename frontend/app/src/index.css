@@ -69,7 +69,65 @@
   * {
     @apply border-border;
   }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer base {
+  .dark .bg-white {
+    background-color: rgb(15 23 42) !important;
+  }
+
+  .dark .bg-gray-50,
+  .dark .bg-slate-50 {
+    background-color: rgb(2 6 23) !important;
+  }
+
+  .dark .bg-slate-100 {
+    background-color: rgb(15 23 42) !important;
+  }
+
+  .dark .border-slate-100,
+  .dark .border-slate-200 {
+    border-color: rgb(51 65 85) !important;
+  }
+
+  .dark .text-slate-800 {
+    color: rgb(248 250 252) !important;
+  }
+
+  .dark .text-slate-700 {
+    color: rgb(226 232 240) !important;
+  }
+
+  .dark .text-slate-600,
+  .dark .text-slate-500 {
+    color: rgb(148 163 184) !important;
+  }
+
+  .dark .text-slate-400 {
+    color: rgb(203 213 225) !important;
+  }
+
+  .dark .hover\:bg-slate-100:hover {
+    background-color: rgb(30 41 59) !important;
+  }
+
+  .dark .bg-blue-50 {
+    background-color: rgb(30 41 59) !important;
+  }
+
+  .dark .text-blue-700 {
+    color: rgb(147 197 253) !important;
   }
 }

@@ -1,4 +1,5 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store';
 import { StatutCommande, StatutPaiement } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -49,8 +50,10 @@ const statutIcons = {
 };
 
 export function CommandesPage() {
+  const { t, i18n } = useTranslation();
   const { commandes, clients, produits, lignesCommande, addCommande, updateCommande, deleteCommande, addFacture } = useStore();
   const { user } = useAuth();
+  const locale = i18n.resolvedLanguage === 'en' ? 'en-US' : 'fr-FR';
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
@@ -68,30 +71,27 @@ export function CommandesPage() {
       getClientName(cmd.clientId).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getClientName = (id: string) => {
+  function getClientName(id: string) {
     const client = clients.find((c) => c.id === id);
-    return client ? `${client.prenom} ${client.nom}` : 'Client inconnu';
-  };
+    return client ? `${client.prenom} ${client.nom}` : t('common.unknownClient');
+  }
 
-  const getProduitName = (id: string) => {
+  function getProduitName(id: string) {
     const produit = produits.find((p) => p.id === id);
-    return produit?.nom || 'Produit inconnu';
-  };
+    return produit?.nom || t('common.unknownProduct');
+  }
 
-  const getCommandeLignes = (commandeId: string) => {
-    return lignesCommande.filter((l) => l.commandeId === commandeId);
-  };
+  const getCommandeLignes = (commandeId: string) => lignesCommande.filter((l) => l.commandeId === commandeId);
 
-  const calculateTotal = () => {
-    return formData.lignes.reduce((total, ligne) => {
+  const calculateTotal = () =>
+    formData.lignes.reduce((total, ligne) => {
       const produit = produits.find((p) => p.id === ligne.produitId);
       return total + (produit?.prix || 0) * ligne.quantite;
     }, 0);
-  };
 
   const handleAdd = async () => {
     if (!formData.clientId || formData.lignes.length === 0) {
-      toast.error('Veuillez sélectionner un client et ajouter au moins un produit');
+      toast.error(t('pages.orders.selectClientAndProduct'));
       return;
     }
 
@@ -118,9 +118,9 @@ export function CommandesPage() {
 
       setIsAddDialogOpen(false);
       setFormData({ clientId: '', notes: '', lignes: [] });
-      toast.success('Commande créée avec succès');
+      toast.success(t('pages.orders.createSuccess'));
     } catch {
-      toast.error('Échec de création de la commande');
+      toast.error(t('pages.orders.createError'));
     }
   };
 
@@ -131,7 +131,7 @@ export function CommandesPage() {
       if (statut === StatutCommande.CONFIRMEE) {
         const commande = commandes.find((c) => c.id === id);
         if (commande) {
-          const factureNumber = `FAC-2024-${String(getNextFactureNumber()).padStart(3, '0')}`;
+          const factureNumber = `FAC-2024-${String(useStore.getState().factures.length + 1).padStart(3, '0')}`;
           await addFacture({
             numeroFacture: factureNumber,
             dateEmission: new Date().toISOString(),
@@ -140,29 +140,27 @@ export function CommandesPage() {
             commandeId: id,
             clientId: commande.clientId,
           });
-          toast.success('Commande confirmée et facture générée');
+          toast.success(t('pages.orders.generatedInvoiceSuccess'));
           return;
         }
       }
 
-      toast.success('Statut mis à jour');
+      toast.success(t('pages.orders.updateStatusSuccess'));
     } catch {
-      toast.error('Échec de mise à jour du statut');
+      toast.error(t('pages.orders.updateStatusError'));
     }
   };
 
-  const getNextFactureNumber = () => {
-    return useStore.getState().factures.length + 1;
-  };
-
   const handleDelete = async (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette commande ?')) {
-      try {
-        await deleteCommande(id);
-        toast.success('Commande supprimée avec succès');
-      } catch {
-        toast.error('Échec de suppression de la commande');
-      }
+    if (!confirm(t('pages.orders.deleteConfirm'))) {
+      return;
+    }
+
+    try {
+      await deleteCommande(id);
+      toast.success(t('pages.orders.deleteSuccess'));
+    } catch {
+      toast.error(t('pages.orders.deleteError'));
     }
   };
 
@@ -186,11 +184,6 @@ export function CommandesPage() {
     });
   };
 
-  const openDetailDialog = (commande: typeof commandes[0]) => {
-    setSelectedCommande(commande);
-    setIsDetailDialogOpen(true);
-  };
-
   const stats = {
     total: commandes.length,
     brouillon: commandes.filter((c) => c.statut === StatutCommande.BROUILLON).length,
@@ -203,32 +196,30 @@ export function CommandesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Gestion des commandes</h1>
-          <p className="text-slate-500">Créez et suivez les commandes clients</p>
+          <h1 className="text-2xl font-bold text-slate-800">{t('pages.orders.title')}</h1>
+          <p className="text-slate-500">{t('pages.orders.subtitle')}</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Nouvelle commande
+              <Plus className="mr-2 h-4 w-4" />
+              {t('pages.orders.new')}
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Créer une commande</DialogTitle>
-              <DialogDescription>
-                Sélectionnez un client et ajoutez des produits
-              </DialogDescription>
+              <DialogTitle>{t('pages.orders.createTitle')}</DialogTitle>
+              <DialogDescription>{t('pages.orders.createDescription')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="client">Client</Label>
+                <Label htmlFor="client">{t('common.client')}</Label>
                 <Select
                   value={String(formData.clientId)}
                   onValueChange={(value) => setFormData({ ...formData, clientId: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un client" />
+                    <SelectValue placeholder={t('pages.orders.selectClient')} />
                   </SelectTrigger>
                   <SelectContent>
                     {clients.map((client) => (
@@ -242,21 +233,21 @@ export function CommandesPage() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Produits</Label>
+                  <Label>{t('common.products')}</Label>
                   <Button type="button" variant="outline" size="sm" onClick={addLigne}>
-                    <Plus className="w-4 h-4 mr-1" />
-                    Ajouter
+                    <Plus className="mr-1 h-4 w-4" />
+                    {t('pages.orders.addProduct')}
                   </Button>
                 </div>
                 {formData.lignes.map((ligne, index) => (
-                  <div key={index} className="flex gap-2 items-end">
+                  <div key={index} className="flex items-end gap-2">
                     <div className="flex-1">
                       <Select
                         value={String(ligne.produitId)}
                         onValueChange={(value) => updateLigne(index, 'produitId', value)}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Produit" />
+                          <SelectValue placeholder={t('pages.orders.productPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
                           {produits.filter((p) => p.disponible).map((produit) => (
@@ -282,117 +273,56 @@ export function CommandesPage() {
                       onClick={() => removeLigne(index)}
                       className="text-red-600"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes">{t('common.notes')}</Label>
                 <Input
                   id="notes"
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Notes éventuelles..."
+                  placeholder={t('pages.orders.optionalNotes')}
                 />
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Total:</span>
-                  <span className="text-xl font-bold">{calculateTotal().toLocaleString('fr-FR')} €</span>
+              <div className="rounded-lg bg-slate-50 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{t('pages.orders.totalLabel')}</span>
+                  <span className="text-xl font-bold">{calculateTotal().toLocaleString(locale)} €</span>
                 </div>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700">
-                Créer la commande
+                {t('pages.orders.createTitle')}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="w-5 h-5 text-slate-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Total</p>
-                <p className="text-xl font-bold">{stats.total}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-slate-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Brouillons</p>
-                <p className="text-xl font-bold">{stats.brouillon}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Confirmées</p>
-                <p className="text-xl font-bold">{stats.confirme}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Truck className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Livrées</p>
-                <p className="text-xl font-bold">{stats.livre}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <XCircle className="w-5 h-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Annulées</p>
-                <p className="text-xl font-bold">{stats.annule}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+        <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100"><ShoppingCart className="h-5 w-5 text-slate-600" /></div><div><p className="text-sm text-slate-500">{t('common.total')}</p><p className="text-xl font-bold">{stats.total}</p></div></div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100"><Package className="h-5 w-5 text-slate-600" /></div><div><p className="text-sm text-slate-500">{t('pages.orders.drafts')}</p><p className="text-xl font-bold">{stats.brouillon}</p></div></div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100"><CheckCircle2 className="h-5 w-5 text-blue-600" /></div><div><p className="text-sm text-slate-500">{t('pages.orders.confirmed')}</p><p className="text-xl font-bold">{stats.confirme}</p></div></div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100"><Truck className="h-5 w-5 text-green-600" /></div><div><p className="text-sm text-slate-500">{t('pages.orders.delivered')}</p><p className="text-xl font-bold">{stats.livre}</p></div></div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100"><XCircle className="h-5 w-5 text-red-600" /></div><div><p className="text-sm text-slate-500">{t('pages.orders.cancelled')}</p><p className="text-xl font-bold">{stats.annule}</p></div></div></CardContent></Card>
       </div>
 
       <Card>
         <CardHeader>
           <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <div className="relative max-w-sm flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
-                placeholder="Rechercher une commande..."
+                placeholder={t('pages.orders.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -404,12 +334,12 @@ export function CommandesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>N° Commande</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Montant</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t('pages.orders.orderNumber')}</TableHead>
+                <TableHead>{t('common.client')}</TableHead>
+                <TableHead>{t('common.date')}</TableHead>
+                <TableHead>{t('common.status')}</TableHead>
+                <TableHead className="text-right">{t('common.amount')}</TableHead>
+                <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -419,54 +349,31 @@ export function CommandesPage() {
                   <TableRow key={commande.id}>
                     <TableCell className="font-medium">CMD-{commande.id}</TableCell>
                     <TableCell>{getClientName(commande.clientId)}</TableCell>
-                    <TableCell>
-                      {new Date(commande.dateCommande).toLocaleDateString('fr-FR')}
-                    </TableCell>
+                    <TableCell>{new Date(commande.dateCommande).toLocaleDateString(locale)}</TableCell>
                     <TableCell>
                       <Badge className={statutColors[commande.statut]}>
-                        <Icon className="w-3 h-3 mr-1" />
-                        {commande.statut}
+                        <Icon className="mr-1 h-3 w-3" />
+                        {t(`statusLabels.order.${commande.statut}`)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      {commande.montantTotal.toLocaleString('fr-FR')} €
-                    </TableCell>
+                    <TableCell className="text-right">{commande.montantTotal.toLocaleString(locale)} €</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openDetailDialog(commande)}
-                        >
-                          <Eye className="w-4 h-4" />
+                        <Button variant="ghost" size="icon" onClick={() => { setSelectedCommande(commande); setIsDetailDialogOpen(true); }}>
+                          <Eye className="h-4 w-4" />
                         </Button>
                         {commande.statut === StatutCommande.BROUILLON && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-green-600"
-                            onClick={() => handleUpdateStatut(commande.id, StatutCommande.CONFIRMEE)}
-                          >
-                            Confirmer
+                          <Button variant="ghost" size="sm" className="text-green-600" onClick={() => handleUpdateStatut(commande.id, StatutCommande.CONFIRMEE)}>
+                            {t('pages.orders.confirmAction')}
                           </Button>
                         )}
                         {commande.statut === StatutCommande.CONFIRMEE && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-blue-600"
-                            onClick={() => handleUpdateStatut(commande.id, StatutCommande.LIVREE)}
-                          >
-                            Livrer
+                          <Button variant="ghost" size="sm" className="text-blue-600" onClick={() => handleUpdateStatut(commande.id, StatutCommande.LIVREE)}>
+                            {t('pages.orders.deliverAction')}
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(commande.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(commande.id)} className="text-red-600 hover:text-red-700">
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -478,60 +385,49 @@ export function CommandesPage() {
         </CardContent>
       </Card>
 
-      {/* Detail Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Commande CMD-{selectedCommande?.id}</DialogTitle>
-            <DialogDescription>
-              Détails de la commande
-            </DialogDescription>
+            <DialogTitle>{t('pages.orders.orderNumber')} CMD-{selectedCommande?.id}</DialogTitle>
+            <DialogDescription>{t('pages.orders.detailsDescription')}</DialogDescription>
           </DialogHeader>
           {selectedCommande && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-slate-500">Client</Label>
+                  <Label className="text-slate-500">{t('common.client')}</Label>
                   <p className="font-medium">{getClientName(selectedCommande.clientId)}</p>
                 </div>
                 <div>
-                  <Label className="text-slate-500">Date</Label>
-                  <p className="font-medium">
-                    {new Date(selectedCommande.dateCommande).toLocaleDateString('fr-FR')}
-                  </p>
+                  <Label className="text-slate-500">{t('common.date')}</Label>
+                  <p className="font-medium">{new Date(selectedCommande.dateCommande).toLocaleDateString(locale)}</p>
                 </div>
                 <div>
-                  <Label className="text-slate-500">Statut</Label>
-                  <p>
-                    <Badge className={statutColors[selectedCommande.statut]}>
-                      {selectedCommande.statut}
-                    </Badge>
-                  </p>
+                  <Label className="text-slate-500">{t('common.status')}</Label>
+                  <p><Badge className={statutColors[selectedCommande.statut]}>{t(`statusLabels.order.${selectedCommande.statut}`)}</Badge></p>
                 </div>
                 <div>
-                  <Label className="text-slate-500">Total</Label>
-                  <p className="font-medium text-lg">
-                    {selectedCommande.montantTotal.toLocaleString('fr-FR')} €
-                  </p>
+                  <Label className="text-slate-500">{t('common.total')}</Label>
+                  <p className="text-lg font-medium">{selectedCommande.montantTotal.toLocaleString(locale)} €</p>
                 </div>
               </div>
 
               {selectedCommande.notes && (
                 <div>
-                  <Label className="text-slate-500">Notes</Label>
+                  <Label className="text-slate-500">{t('common.notes')}</Label>
                   <p className="text-sm">{selectedCommande.notes}</p>
                 </div>
               )}
 
               <div>
-                <Label className="text-slate-500">Produits</Label>
+                <Label className="text-slate-500">{t('common.products')}</Label>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Produit</TableHead>
-                      <TableHead className="text-right">Qté</TableHead>
-                      <TableHead className="text-right">Prix unit.</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead>{t('common.products').slice(0, -1) || t('pages.orders.productPlaceholder')}</TableHead>
+                      <TableHead className="text-right">{t('common.quantityShort')}</TableHead>
+                      <TableHead className="text-right">{t('common.unitPrice')}</TableHead>
+                      <TableHead className="text-right">{t('common.total')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -539,12 +435,8 @@ export function CommandesPage() {
                       <TableRow key={ligne.id}>
                         <TableCell>{getProduitName(ligne.produitId)}</TableCell>
                         <TableCell className="text-right">{ligne.quantite}</TableCell>
-                        <TableCell className="text-right">
-                          {ligne.prixUnitaire.toLocaleString('fr-FR')} €
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {ligne.sousTotal.toLocaleString('fr-FR')} €
-                        </TableCell>
+                        <TableCell className="text-right">{ligne.prixUnitaire.toLocaleString(locale)} €</TableCell>
+                        <TableCell className="text-right">{ligne.sousTotal.toLocaleString(locale)} €</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -557,4 +449,3 @@ export function CommandesPage() {
     </div>
   );
 }
-

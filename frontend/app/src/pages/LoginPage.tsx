@@ -1,22 +1,26 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export function LoginPage() {
   const { login } = useAuth();
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Reset flow states
   const [resetStep, setResetStep] = useState(1);
   const [resetEmail, setResetEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
@@ -35,7 +39,7 @@ export function LoginPage() {
     try {
       await login(email, password, rememberMe);
     } catch (err: any) {
-      setError(err.message || 'Échec de la connexion. Veuillez réessayer.');
+      setError(err.message || t('login.loginFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -45,7 +49,7 @@ export function LoginPage() {
     e.preventDefault();
 
     if (!resetEmail || !/\S+@\S+\.\S+/.test(resetEmail)) {
-      setResetError('Veuillez entrer une adresse e-mail valide');
+      setResetError(t('reset.invalidEmail'));
       return;
     }
 
@@ -59,11 +63,13 @@ export function LoginPage() {
         body: JSON.stringify({ email: resetEmail }),
       });
 
-      if (!response.ok) throw new Error('Échec de l\'envoi du code de réinitialisation');
+      if (!response.ok) {
+        throw new Error(t('reset.sendCodeFailed'));
+      }
 
       setResetStep(2);
     } catch (err: any) {
-      setResetError(err.message || 'Échec de l\'envoi du code de réinitialisation');
+      setResetError(err.message || t('reset.sendCodeFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +79,7 @@ export function LoginPage() {
     e.preventDefault();
 
     if (!resetCode || resetCode.length !== 6) {
-      setResetError('Veuillez entrer le code à 6 chiffres');
+      setResetError(t('reset.invalidCodeLength'));
       return;
     }
 
@@ -86,11 +92,13 @@ export function LoginPage() {
         { method: 'POST' }
       );
 
-      if (!response.ok) throw new Error('Code invalide ou expiré');
+      if (!response.ok) {
+        throw new Error(t('reset.invalidCode'));
+      }
 
       setResetStep(3);
     } catch (err: any) {
-      setResetError(err.message || 'Code invalide ou expiré');
+      setResetError(err.message || t('reset.invalidCode'));
     } finally {
       setIsLoading(false);
     }
@@ -100,12 +108,12 @@ export function LoginPage() {
     e.preventDefault();
 
     if (!newPassword || newPassword.length < 4) {
-      setResetError('Le mot de passe doit contenir au moins 4 caractères');
+      setResetError(t('reset.newPasswordTooShort'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setResetError('Les mots de passe ne correspondent pas');
+      setResetError(t('reset.passwordMismatch'));
       return;
     }
 
@@ -123,11 +131,13 @@ export function LoginPage() {
         }),
       });
 
-      if (!response.ok) throw new Error('Échec de la réinitialisation du mot de passe');
+      if (!response.ok) {
+        throw new Error(t('reset.resetFailed'));
+      }
 
       setResetSuccess(true);
     } catch (err: any) {
-      setResetError(err.message || 'Échec de la réinitialisation du mot de passe');
+      setResetError(err.message || t('reset.resetFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -146,20 +156,24 @@ export function LoginPage() {
 
   if (showForgotPassword) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="relative min-h-screen flex items-center justify-center bg-gray-50 p-4 dark:bg-slate-950">
+        <div className="absolute right-4 top-4 flex items-center gap-2">
+          <LanguageSwitcher />
+          <ThemeToggle />
+        </div>
         <Card className="w-full max-w-md">
-          <CardHeader>
+          <CardHeader className="space-y-4">
             <CardTitle>
-              {resetStep === 1 && 'Réinitialiser le mot de passe'}
-              {resetStep === 2 && 'Entrer le code de vérification'}
-              {resetStep === 3 && 'Définir un nouveau mot de passe'}
-              {resetSuccess && 'Réinitialisation du mot de passe terminée'}
+              {resetStep === 1 && t('reset.titleStep1')}
+              {resetStep === 2 && t('reset.titleStep2')}
+              {resetStep === 3 && t('reset.titleStep3')}
+              {resetSuccess && t('reset.titleSuccess')}
             </CardTitle>
             <CardDescription>
-              {resetStep === 1 && 'Entrez votre adresse e-mail pour recevoir un code de vérification'}
-              {resetStep === 2 && `Entrez le code à 6 chiffres envoyé à ${resetEmail}`}
-              {resetStep === 3 && 'Créez un nouveau mot de passe pour votre compte'}
-              {resetSuccess && 'Votre mot de passe a été réinitialisé avec succès'}
+              {resetStep === 1 && t('reset.descStep1')}
+              {resetStep === 2 && t('reset.descStep2', { email: resetEmail })}
+              {resetStep === 3 && t('reset.descStep3')}
+              {resetSuccess && t('reset.descSuccess')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -174,13 +188,13 @@ export function LoginPage() {
                 {resetStep === 1 && (
                   <form onSubmit={handleSendResetCode} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="resetEmail">Adresse e-mail</Label>
+                      <Label htmlFor="resetEmail">{t('reset.emailLabel')}</Label>
                       <Input
                         id="resetEmail"
                         type="email"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
-                        placeholder="Entrez votre adresse e-mail"
+                        placeholder={t('reset.emailPlaceholder')}
                         autoFocus
                       />
                     </div>
@@ -191,11 +205,11 @@ export function LoginPage() {
                         onClick={handleCloseForgotPassword}
                         className="w-1/2"
                       >
-                        Annuler
+                        {t('reset.cancel')}
                       </Button>
-                      <Button type="submit" disabled={isLoading} className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white">
+                      <Button type="submit" disabled={isLoading} className="w-1/2 bg-blue-600 text-white hover:bg-blue-700">
                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Envoyer le code
+                        {t('reset.sendCode')}
                       </Button>
                     </div>
                   </form>
@@ -204,20 +218,18 @@ export function LoginPage() {
                 {resetStep === 2 && (
                   <form onSubmit={handleVerifyCode} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="resetCode">Code de vérification</Label>
+                      <Label htmlFor="resetCode">{t('reset.codeLabel')}</Label>
                       <Input
                         id="resetCode"
                         type="text"
                         value={resetCode}
                         onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="000000"
+                        placeholder={t('reset.codePlaceholder')}
                         maxLength={6}
                         autoFocus
                         className="text-center text-2xl tracking-widest"
                       />
-                      <p className="text-sm text-muted-foreground">
-                        Entrez le code à 6 chiffres de votre e-mail
-                      </p>
+                      <p className="text-sm text-muted-foreground">{t('reset.codeHint')}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -226,11 +238,11 @@ export function LoginPage() {
                         onClick={() => setResetStep(1)}
                         className="w-1/2"
                       >
-                        Retour
+                        {t('reset.back')}
                       </Button>
-                      <Button type="submit" disabled={isLoading} className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white">
+                      <Button type="submit" disabled={isLoading} className="w-1/2 bg-blue-600 text-white hover:bg-blue-700">
                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Vérifier
+                        {t('reset.verify')}
                       </Button>
                     </div>
                   </form>
@@ -239,24 +251,24 @@ export function LoginPage() {
                 {resetStep === 3 && (
                   <form onSubmit={handleSetNewPassword} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="newPassword">Nouveau mot de passe</Label>
+                      <Label htmlFor="newPassword">{t('reset.newPasswordLabel')}</Label>
                       <Input
                         id="newPassword"
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Entrez le nouveau mot de passe"
+                        placeholder={t('reset.newPasswordPlaceholder')}
                         autoFocus
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+                      <Label htmlFor="confirmPassword">{t('reset.confirmPasswordLabel')}</Label>
                       <Input
                         id="confirmPassword"
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirmez le nouveau mot de passe"
+                        placeholder={t('reset.confirmPasswordPlaceholder')}
                       />
                     </div>
                     <div className="flex gap-2">
@@ -266,11 +278,11 @@ export function LoginPage() {
                         onClick={() => setResetStep(2)}
                         className="w-1/2"
                       >
-                        Retour
+                        {t('reset.back')}
                       </Button>
-                      <Button type="submit" disabled={isLoading} className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white">
+                      <Button type="submit" disabled={isLoading} className="w-1/2 bg-blue-600 text-white hover:bg-blue-700">
                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Réinitialiser le mot de passe
+                        {t('reset.submit')}
                       </Button>
                     </div>
                   </form>
@@ -278,16 +290,14 @@ export function LoginPage() {
               </>
             ) : (
               <div className="space-y-4 text-center">
-                <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                  <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <p className="text-muted-foreground">
-                  Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.
-                </p>
-                <Button onClick={handleCloseForgotPassword} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                  Retour à la connexion
+                <p className="text-muted-foreground">{t('reset.successMessage')}</p>
+                <Button onClick={handleCloseForgotPassword} className="w-full bg-blue-600 text-white hover:bg-blue-700">
+                  {t('reset.backToLogin')}
                 </Button>
               </div>
             )}
@@ -298,11 +308,15 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-gray-50 p-4 dark:bg-slate-950">
+      <div className="absolute right-4 top-4 flex items-center gap-2">
+        <LanguageSwitcher />
+        <ThemeToggle />
+      </div>
       <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Portail de connexion</CardTitle>
-          <CardDescription>Connectez-vous pour accéder à l'application</CardDescription>
+        <CardHeader className="space-y-4">
+          <CardTitle>{t('login.portalTitle')}</CardTitle>
+          <CardDescription>{t('login.portalDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -313,28 +327,39 @@ export function LoginPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Adresse e-mail</Label>
+              <Label htmlFor="email">{t('login.emailLabel')}</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@example.com"
+                placeholder={t('login.emailPlaceholder')}
                 required
                 autoFocus
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Entrez votre mot de passe"
-                required
-              />
+              <Label htmlFor="password">{t('login.passwordLabel')}</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t('login.passwordPlaceholder')}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-700"
+                  aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
@@ -345,7 +370,7 @@ export function LoginPage() {
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
-                <span>Se souvenir de moi</span>
+                <span>{t('login.rememberMe')}</span>
               </label>
               <Button
                 type="button"
@@ -353,13 +378,13 @@ export function LoginPage() {
                 className="px-0"
                 onClick={() => setShowForgotPassword(true)}
               >
-                Mot de passe oublié ?
+                {t('login.forgotPassword')}
               </Button>
             </div>
 
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={isLoading}>
+            <Button type="submit" className="w-full bg-blue-600 text-white hover:bg-blue-700" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Se connecter
+              {t('login.submit')}
             </Button>
           </form>
         </CardContent>

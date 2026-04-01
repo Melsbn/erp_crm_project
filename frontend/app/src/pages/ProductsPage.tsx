@@ -32,8 +32,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Search, Edit2, Trash2, Package, Tag, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 export function ProductsPage() {
+  const { t } = useTranslation();
   const { produits, categories, addProduit, updateProduit, deleteProduit, addCategorie } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
@@ -66,9 +68,9 @@ export function ProductsPage() {
       await addProduit(productForm);
       setIsAddProductDialogOpen(false);
       resetProductForm();
-      toast.success('Produit créé avec succès');
+      toast.success(t('pages.products.createProductSuccess'));
     } catch {
-      toast.error('Échec de création du produit');
+      toast.error(t('pages.products.createProductError'));
     }
   };
 
@@ -77,9 +79,9 @@ export function ProductsPage() {
       await addCategorie(categoryForm);
       setIsAddCategoryDialogOpen(false);
       setCategoryForm({ nom: '', description: '' });
-      toast.success('Catégorie créée avec succès');
+      toast.success(t('pages.products.createCategorySuccess'));
     } catch {
-      toast.error('Échec de création de la catégorie');
+      toast.error(t('pages.products.createCategoryError'));
     }
   };
 
@@ -89,20 +91,20 @@ export function ProductsPage() {
         await updateProduit(selectedProduct.id, productForm);
         setIsEditDialogOpen(false);
         setSelectedProduct(null);
-        toast.success('Produit mis à jour avec succès');
+        toast.success(t('pages.products.updateSuccess'));
       } catch {
-        toast.error('Échec de mise à jour du produit');
+        toast.error(t('pages.products.updateError'));
       }
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
+    if (confirm(t('pages.products.deleteConfirm'))) {
       try {
         await deleteProduit(id);
-        toast.success('Produit supprimé avec succès');
+        toast.success(t('pages.products.deleteSuccess'));
       } catch {
-        toast.error('Échec de suppression du produit');
+        toast.error(t('pages.products.deleteError'));
       }
     }
   };
@@ -132,7 +134,7 @@ export function ProductsPage() {
   };
 
   const getCategoryName = (id: string) => {
-    return categories.find((c) => c.id === id)?.nom || 'Non catégorisé';
+    return categories.find((c) => c.id === id)?.nom || t('pages.products.uncategorized');
   };
 
   const stats = {
@@ -146,27 +148,25 @@ export function ProductsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Gestion des produits</h1>
-          <p className="text-slate-500">Gérez votre catalogue produits et services</p>
+          <h1 className="text-2xl font-bold text-slate-800">{t('pages.products.title')}</h1>
+          <p className="text-slate-500">{t('pages.products.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isAddCategoryDialogOpen} onOpenChange={setIsAddCategoryDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Tag className="w-4 h-4 mr-2" />
-                Nouvelle catégorie
+                {t('pages.products.newCategory')}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Créer une catégorie</DialogTitle>
-                <DialogDescription>
-                  Ajoutez une nouvelle catégorie de produits
-                </DialogDescription>
+                <DialogTitle>{t('pages.products.createCategoryTitle')}</DialogTitle>
+                <DialogDescription>{t('pages.products.createCategoryDescription')}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="cat-nom">Nom</Label>
+                  <Label htmlFor="cat-nom">{t('common.name')}</Label>
                   <Input
                     id="cat-nom"
                     value={categoryForm.nom}
@@ -174,7 +174,7 @@ export function ProductsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cat-description">Description</Label>
+                  <Label htmlFor="cat-description">{t('common.description')}</Label>
                   <Input
                     id="cat-description"
                     value={categoryForm.description}
@@ -184,10 +184,10 @@ export function ProductsPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddCategoryDialogOpen(false)}>
-                  Annuler
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={handleAddCategory} className="bg-blue-600 hover:bg-blue-700">
-                  Créer
+                  {t('common.create')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -197,19 +197,17 @@ export function ProductsPage() {
             <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="w-4 h-4 mr-2" />
-                Nouveau produit
+                {t('pages.products.newProduct')}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Créer un produit</DialogTitle>
-                <DialogDescription>
-                  Remplissez les informations pour créer un nouveau produit
-                </DialogDescription>
+                <DialogTitle>{t('pages.products.createProductTitle')}</DialogTitle>
+                <DialogDescription>{t('pages.products.createProductDescription')}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="nom">Nom</Label>
+                  <Label htmlFor="nom">{t('common.name')}</Label>
                   <Input
                     id="nom"
                     value={productForm.nom}
@@ -217,7 +215,7 @@ export function ProductsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">{t('common.description')}</Label>
                   <Input
                     id="description"
                     value={productForm.description}
@@ -226,7 +224,7 @@ export function ProductsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="prix">Prix (€)</Label>
+                    <Label htmlFor="prix">{t('common.price')} (€)</Label>
                     <Input
                       id="prix"
                       type="number"
@@ -235,7 +233,7 @@ export function ProductsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="stock">Stock</Label>
+                    <Label htmlFor="stock">{t('common.stock')}</Label>
                     <Input
                       id="stock"
                       type="number"
@@ -245,7 +243,7 @@ export function ProductsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="categorie">Catégorie</Label>
+                  <Label htmlFor="categorie">{t('common.category')}</Label>
                   <Select
                     value={String(productForm.categorieId)}
                     onValueChange={(value) => setProductForm({ ...productForm, categorieId: value })}
@@ -265,10 +263,10 @@ export function ProductsPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddProductDialogOpen(false)}>
-                  Annuler
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={handleAddProduct} className="bg-blue-600 hover:bg-blue-700">
-                  Créer
+                  {t('common.create')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -285,7 +283,7 @@ export function ProductsPage() {
                 <Package className="w-5 h-5 text-slate-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Total produits</p>
+                <p className="text-sm text-slate-500">{t('pages.products.totalProducts')}</p>
                 <p className="text-xl font-bold">{stats.total}</p>
               </div>
             </div>
@@ -298,7 +296,7 @@ export function ProductsPage() {
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Disponibles</p>
+                <p className="text-sm text-slate-500">{t('common.available')}s</p>
                 <p className="text-xl font-bold">{stats.disponible}</p>
               </div>
             </div>
@@ -311,7 +309,7 @@ export function ProductsPage() {
                 <XCircle className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Indisponibles</p>
+                <p className="text-sm text-slate-500">{t('common.unavailable')}s</p>
                 <p className="text-xl font-bold">{stats.indisponible}</p>
               </div>
             </div>
@@ -324,7 +322,7 @@ export function ProductsPage() {
                 <Tag className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Stock faible</p>
+                <p className="text-sm text-slate-500">{t('pages.products.lowStock')}</p>
                 <p className="text-xl font-bold">{stats.stockFaible}</p>
               </div>
             </div>
@@ -334,8 +332,8 @@ export function ProductsPage() {
 
       <Tabs defaultValue="products" className="w-full">
         <TabsList>
-          <TabsTrigger value="products">Produits</TabsTrigger>
-          <TabsTrigger value="categories">Catégories</TabsTrigger>
+          <TabsTrigger value="products">{t('common.products')}</TabsTrigger>
+          <TabsTrigger value="categories">{t('pages.products.categories')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-4">
@@ -345,7 +343,7 @@ export function ProductsPage() {
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input
-                    placeholder="Rechercher un produit..."
+                    placeholder={t('pages.products.search')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -357,12 +355,12 @@ export function ProductsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Catégorie</TableHead>
-                    <TableHead>Prix</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t('common.name')}</TableHead>
+                    <TableHead>{t('common.category')}</TableHead>
+                    <TableHead>{t('common.price')}</TableHead>
+                    <TableHead>{t('common.stock')}</TableHead>
+                    <TableHead>{t('common.status')}</TableHead>
+                    <TableHead className="text-right">{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -380,12 +378,12 @@ export function ProductsPage() {
                         {product.disponible ? (
                           <Badge className="bg-green-100 text-green-700">
                             <CheckCircle2 className="w-3 h-3 mr-1" />
-                            Disponible
+                            {t('common.available')}
                           </Badge>
                         ) : (
                           <Badge className="bg-red-100 text-red-700">
                             <XCircle className="w-3 h-3 mr-1" />
-                            Indisponible
+                            {t('common.unavailable')}
                           </Badge>
                         )}
                       </TableCell>
@@ -432,7 +430,7 @@ export function ProductsPage() {
                       <div>
                         <h3 className="font-medium">{category.nom}</h3>
                         <p className="text-sm text-slate-500">
-                          {produits.filter((p) => p.categorieId === category.id).length} produits
+                          {t('pages.products.categoryProductsCount', { count: produits.filter((p) => p.categorieId === category.id).length })}
                         </p>
                       </div>
                     </div>
@@ -449,14 +447,12 @@ export function ProductsPage() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Modifier le produit</DialogTitle>
-            <DialogDescription>
-              Modifiez les informations du produit
-            </DialogDescription>
+            <DialogTitle>{t('pages.products.editTitle')}</DialogTitle>
+            <DialogDescription>{t('pages.products.editDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-nom">Nom</Label>
+              <Label htmlFor="edit-nom">{t('common.name')}</Label>
               <Input
                 id="edit-nom"
                 value={productForm.nom}
@@ -464,7 +460,7 @@ export function ProductsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
+              <Label htmlFor="edit-description">{t('common.description')}</Label>
               <Input
                 id="edit-description"
                 value={productForm.description}
@@ -473,7 +469,7 @@ export function ProductsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-prix">Prix (€)</Label>
+                <Label htmlFor="edit-prix">{t('common.price')} (€)</Label>
                 <Input
                   id="edit-prix"
                   type="number"
@@ -482,7 +478,7 @@ export function ProductsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-stock">Stock</Label>
+                <Label htmlFor="edit-stock">{t('common.stock')}</Label>
                 <Input
                   id="edit-stock"
                   type="number"
@@ -492,7 +488,7 @@ export function ProductsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-disponible">Disponibilité</Label>
+              <Label htmlFor="edit-disponible">{t('pages.products.availability')}</Label>
               <Select
                 value={productForm.disponible ? 'true' : 'false'}
                 onValueChange={(value) => setProductForm({ ...productForm, disponible: value === 'true' })}
@@ -501,18 +497,18 @@ export function ProductsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="true">Disponible</SelectItem>
-                  <SelectItem value="false">Indisponible</SelectItem>
+                  <SelectItem value="true">{t('common.available')}</SelectItem>
+                  <SelectItem value="false">{t('common.unavailable')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleEdit} className="bg-blue-600 hover:bg-blue-700">
-              Enregistrer
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -520,5 +516,4 @@ export function ProductsPage() {
     </div>
   );
 }
-
 

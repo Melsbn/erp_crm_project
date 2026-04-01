@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatutCommande, StatutPaiement } from '@/types';
@@ -35,6 +36,7 @@ import {
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export function DashboardPage() {
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const {
     clients,
@@ -45,7 +47,8 @@ export function DashboardPage() {
     interactions,
   } = useStore();
 
-  // KPIs
+  const locale = i18n.resolvedLanguage === 'en' ? 'en-US' : 'fr-FR';
+
   const kpis = useMemo(() => {
     const totalVentes = commandes.reduce((sum, c) => sum + c.montantTotal, 0);
     const totalClients = clients.length;
@@ -57,9 +60,6 @@ export function DashboardPage() {
     const facturesEnAttente = factures.filter(
       (f) => f.statutPaiement === StatutPaiement.EN_ATTENTE
     ).length;
-    const montantFacturesEnAttente = factures
-      .filter((f) => f.statutPaiement === StatutPaiement.EN_ATTENTE)
-      .reduce((sum, f) => sum + f.montantTotal, 0);
 
     return {
       totalVentes,
@@ -68,22 +68,22 @@ export function DashboardPage() {
       totalCommandes,
       commandesEnCours,
       facturesEnAttente,
-      montantFacturesEnAttente,
       panierMoyen: totalCommandes > 0 ? totalVentes / totalCommandes : 0,
     };
   }, [clients, prospects, commandes, factures]);
 
-  // Sales by month
   const ventesParMois = useMemo(() => {
-    const mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'];
+    const mois = locale === 'en-US'
+      ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+      : ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'];
+
     return mois.map((m) => ({
       mois: m,
       montant: Math.floor(Math.random() * 10000) + 5000,
       commandes: Math.floor(Math.random() * 20) + 5,
     }));
-  }, []);
+  }, [locale]);
 
-  // Orders by status
   const commandesParStatut = useMemo(() => {
     const stats = Object.values(StatutCommande).map((statut) => ({
       name: statut,
@@ -92,7 +92,6 @@ export function DashboardPage() {
     return stats.filter((s) => s.value > 0);
   }, [commandes]);
 
-  // Top products
   const topProduits = useMemo(() => {
     return produits.slice(0, 5).map((p) => ({
       name: p.nom,
@@ -101,7 +100,6 @@ export function DashboardPage() {
     }));
   }, [produits]);
 
-  // Recent activity
   const recentActivity = useMemo(() => {
     return interactions
       .slice(-5)
@@ -110,32 +108,29 @@ export function DashboardPage() {
         id: i.id,
         type: i.type,
         description: i.description,
-        date: new Date(i.date).toLocaleDateString('fr-FR'),
+        date: new Date(i.date).toLocaleDateString(locale),
       }));
-  }, [interactions]);
+  }, [interactions, locale]);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Tableau de bord</h1>
-        <p className="text-slate-500">
-          Bienvenue, {user?.email}
-        </p>
+        <h1 className="text-2xl font-bold text-slate-800">{t('pages.dashboard.title')}</h1>
+        <p className="text-slate-500">{t('pages.dashboard.welcome', { email: user?.email ?? '' })}</p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">Chiffre d'affaires</p>
+                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.revenue')}</p>
                 <p className="text-2xl font-bold text-slate-800">
-                  {kpis.totalVentes.toLocaleString('fr-FR')} €
+                  {kpis.totalVentes.toLocaleString(locale)} €
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-blue-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
+                <DollarSign className="h-6 w-6 text-blue-600" />
               </div>
             </div>
           </CardContent>
@@ -145,11 +140,11 @@ export function DashboardPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">Clients</p>
+                <p className="text-sm font-medium text-slate-500">{t('navigation.clients')}</p>
                 <p className="text-2xl font-bold text-slate-800">{kpis.totalClients}</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-green-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
+                <Users className="h-6 w-6 text-green-600" />
               </div>
             </div>
           </CardContent>
@@ -159,11 +154,11 @@ export function DashboardPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">Commandes</p>
+                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.orders')}</p>
                 <p className="text-2xl font-bold text-slate-800">{kpis.totalCommandes}</p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="w-6 h-6 text-purple-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100">
+                <ShoppingCart className="h-6 w-6 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -173,29 +168,28 @@ export function DashboardPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">Panier moyen</p>
+                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.avgBasket')}</p>
                 <p className="text-2xl font-bold text-slate-800">
                   {kpis.panierMoyen.toFixed(0)} €
                 </p>
               </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-orange-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-100">
+                <TrendingUp className="h-6 w-6 text-orange-600" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Secondary KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <UserPlus className="w-5 h-5 text-yellow-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-100">
+                <UserPlus className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-500">Prospects</p>
+                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.prospects')}</p>
                 <p className="text-xl font-bold text-slate-800">{kpis.totalProspects}</p>
               </div>
             </div>
@@ -205,11 +199,11 @@ export function DashboardPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-blue-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+                <Package className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-500">Commandes en cours</p>
+                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.ongoingOrders')}</p>
                 <p className="text-xl font-bold text-slate-800">{kpis.commandesEnCours}</p>
               </div>
             </div>
@@ -219,11 +213,11 @@ export function DashboardPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-red-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
+                <FileText className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-500">Factures en attente</p>
+                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.pendingInvoices')}</p>
                 <p className="text-xl font-bold text-slate-800">{kpis.facturesEnAttente}</p>
               </div>
             </div>
@@ -231,13 +225,11 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales Chart */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Ventes mensuelles</CardTitle>
-            <CardDescription>Évolution du chiffre d'affaires</CardDescription>
+            <CardTitle>{t('pages.dashboard.monthlySales')}</CardTitle>
+            <CardDescription>{t('pages.dashboard.salesTrend')}</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -245,20 +237,17 @@ export function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="mois" />
                 <YAxis />
-                <Tooltip
-                  formatter={(value: number) => `${value.toLocaleString('fr-FR')} €`}
-                />
+                <Tooltip formatter={(value: number) => `${value.toLocaleString(locale)} €`} />
                 <Bar dataKey="montant" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Orders by Status */}
         <Card>
           <CardHeader>
-            <CardTitle>Commandes par statut</CardTitle>
-            <CardDescription>Répartition des commandes</CardDescription>
+            <CardTitle>{t('pages.dashboard.ordersByStatus')}</CardTitle>
+            <CardDescription>{t('pages.dashboard.orderBreakdown')}</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -279,14 +268,14 @@ export function DashboardPage() {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex flex-wrap justify-center gap-4 mt-4">
+            <div className="mt-4 flex flex-wrap justify-center gap-4">
               {commandesParStatut.map((item, index) => (
                 <div key={item.name} className="flex items-center gap-2">
                   <div
-                    className="w-3 h-3 rounded-full"
+                    className="h-3 w-3 rounded-full"
                     style={{ backgroundColor: COLORS[index % COLORS.length] }}
                   />
-                  <span className="text-sm text-slate-600">{item.name}</span>
+                  <span className="text-sm text-slate-600">{t(`statusLabels.order.${item.name}`)}</span>
                 </div>
               ))}
             </div>
@@ -294,12 +283,11 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* Top Products & Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Produits populaires</CardTitle>
-            <CardDescription>Top 5 des produits les plus vendus</CardDescription>
+            <CardTitle>{t('pages.dashboard.popularProducts')}</CardTitle>
+            <CardDescription>{t('pages.dashboard.topProducts')}</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
@@ -316,18 +304,20 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Activité récente</CardTitle>
-            <CardDescription>Dernières interactions</CardDescription>
+            <CardTitle>{t('pages.dashboard.recentActivity')}</CardTitle>
+            <CardDescription>{t('pages.dashboard.latestInteractions')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {recentActivity.map((activity) => (
                 <div key={activity.id} className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Activity className="w-4 h-4 text-blue-600" />
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                    <Activity className="h-4 w-4 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-800">{activity.type}</p>
+                    <p className="text-sm font-medium text-slate-800">
+                      {t(`statusLabels.interaction.${activity.type}`)}
+                    </p>
                     <p className="text-sm text-slate-500">{activity.description}</p>
                     <p className="text-xs text-slate-400">{activity.date}</p>
                   </div>

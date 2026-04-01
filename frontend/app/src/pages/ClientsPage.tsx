@@ -33,14 +33,18 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Search, Edit2, Trash2, Building2, User, History, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 export function ClientsPage() {
+  const { t } = useTranslation();
   const { clients, commandes, interactions, addClient, updateClient, deleteClient } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<typeof clients[0] | null>(null);
+
+  const getClientTypeLabel = (type: ClientType) => t(`statusLabels.clientType.${type}`);
 
   const [formData, setFormData] = useState({
     nom: '',
@@ -65,9 +69,9 @@ export function ClientsPage() {
       await addClient(formData);
       setIsAddDialogOpen(false);
       resetForm();
-      toast.success('Client créé avec succès');
+      toast.success(t('pages.clients.createSuccess'));
     } catch {
-      toast.error("Échec de création du client");
+      toast.error(t('pages.clients.createError'));
     }
   };
 
@@ -77,20 +81,20 @@ export function ClientsPage() {
         await updateClient(selectedClient.id, formData);
         setIsEditDialogOpen(false);
         setSelectedClient(null);
-        toast.success('Client mis à jour avec succès');
+        toast.success(t('pages.clients.updateSuccess'));
       } catch {
-        toast.error("Échec de mise à jour du client");
+        toast.error(t('pages.clients.updateError'));
       }
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) {
+    if (confirm(t('pages.clients.deleteConfirm'))) {
       try {
         await deleteClient(id);
-        toast.success('Client supprimé avec succès');
+        toast.success(t('pages.clients.deleteSuccess'));
       } catch {
-        toast.error("Échec de suppression du client");
+        toast.error(t('pages.clients.deleteError'));
       }
     }
   };
@@ -138,27 +142,25 @@ export function ClientsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Gestion des clients</h1>
-          <p className="text-slate-500">Gérez vos clients et leur historique</p>
+          <h1 className="text-2xl font-bold text-slate-800">{t('pages.clients.title')}</h1>
+          <p className="text-slate-500">{t('pages.clients.subtitle')}</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
               <Plus className="w-4 h-4 mr-2" />
-              Nouveau client
+              {t('pages.clients.new')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Créer un client</DialogTitle>
-              <DialogDescription>
-                Remplissez les informations pour créer un nouveau client
-              </DialogDescription>
+              <DialogTitle>{t('pages.clients.createTitle')}</DialogTitle>
+              <DialogDescription>{t('pages.clients.createDescription')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="prenom">Prénom</Label>
+                  <Label htmlFor="prenom">{t('common.firstName')}</Label>
                   <Input
                     id="prenom"
                     value={formData.prenom}
@@ -166,7 +168,7 @@ export function ClientsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nom">Nom</Label>
+                  <Label htmlFor="nom">{t('common.name')}</Label>
                   <Input
                     id="nom"
                     value={formData.nom}
@@ -175,7 +177,7 @@ export function ClientsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('common.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -184,7 +186,7 @@ export function ClientsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="telephone">Téléphone</Label>
+                <Label htmlFor="telephone">{t('common.phone')}</Label>
                 <Input
                   id="telephone"
                   value={formData.telephone}
@@ -192,7 +194,7 @@ export function ClientsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="type">Type</Label>
+                <Label htmlFor="type">{t('common.type')}</Label>
                 <Select
                   value={formData.type}
                   onValueChange={(value) => setFormData({ ...formData, type: value as ClientType })}
@@ -201,14 +203,14 @@ export function ClientsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PARTICULIER">Particulier</SelectItem>
-                    <SelectItem value="ENTREPRISE">Entreprise</SelectItem>
+                    <SelectItem value="PARTICULIER">{t('statusLabels.clientType.PARTICULIER')}</SelectItem>
+                    <SelectItem value="ENTREPRISE">{t('statusLabels.clientType.ENTREPRISE')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               {formData.type === 'ENTREPRISE' && (
                 <div className="space-y-2">
-                  <Label htmlFor="entreprise">Entreprise</Label>
+                  <Label htmlFor="entreprise">{t('common.company')}</Label>
                   <Input
                     id="entreprise"
                     value={formData.entreprise}
@@ -217,7 +219,7 @@ export function ClientsPage() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="adresse">Adresse</Label>
+                <Label htmlFor="adresse">{t('common.address')}</Label>
                 <Input
                   id="adresse"
                   value={formData.adresse}
@@ -227,10 +229,10 @@ export function ClientsPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700">
-                Créer
+                {t('common.create')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -243,7 +245,7 @@ export function ClientsPage() {
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Rechercher un client..."
+                placeholder={t('pages.clients.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -255,12 +257,12 @@ export function ClientsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Téléphone</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Entreprise</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t('common.name')}</TableHead>
+                <TableHead>{t('common.email')}</TableHead>
+                <TableHead>{t('common.phone')}</TableHead>
+                <TableHead>{t('common.type')}</TableHead>
+                <TableHead>{t('common.company')}</TableHead>
+                <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -284,7 +286,7 @@ export function ClientsPage() {
                       ) : (
                         <User className="w-3 h-3 mr-1" />
                       )}
-                      {client.type}
+                      {getClientTypeLabel(client.type)}
                     </Badge>
                   </TableCell>
                   <TableCell>{client.entreprise || '-'}</TableCell>
@@ -295,7 +297,7 @@ export function ClientsPage() {
                         size="sm"
                         onClick={() => openDetailDialog(client)}
                       >
-                        Détails
+                        {t('common.details')}
                       </Button>
                       <Button
                         variant="ghost"
@@ -325,15 +327,13 @@ export function ClientsPage() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Modifier le client</DialogTitle>
-            <DialogDescription>
-              Modifiez les informations du client
-            </DialogDescription>
+            <DialogTitle>{t('pages.clients.editTitle')}</DialogTitle>
+            <DialogDescription>{t('pages.clients.editDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-prenom">Prénom</Label>
+                <Label htmlFor="edit-prenom">{t('common.firstName')}</Label>
                 <Input
                   id="edit-prenom"
                   value={formData.prenom}
@@ -341,7 +341,7 @@ export function ClientsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-nom">Nom</Label>
+                <Label htmlFor="edit-nom">{t('common.name')}</Label>
                 <Input
                   id="edit-nom"
                   value={formData.nom}
@@ -350,7 +350,7 @@ export function ClientsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
+              <Label htmlFor="edit-email">{t('common.email')}</Label>
               <Input
                 id="edit-email"
                 type="email"
@@ -359,7 +359,7 @@ export function ClientsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-telephone">Téléphone</Label>
+              <Label htmlFor="edit-telephone">{t('common.phone')}</Label>
               <Input
                 id="edit-telephone"
                 value={formData.telephone}
@@ -367,7 +367,7 @@ export function ClientsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-adresse">Adresse</Label>
+              <Label htmlFor="edit-adresse">{t('common.address')}</Label>
               <Input
                 id="edit-adresse"
                 value={formData.adresse}
@@ -377,10 +377,10 @@ export function ClientsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleEdit} className="bg-blue-600 hover:bg-blue-700">
-              Enregistrer
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -394,48 +394,48 @@ export function ClientsPage() {
               {selectedClient?.prenom} {selectedClient?.nom}
             </DialogTitle>
             <DialogDescription>
-              Détails et historique du client
+              {t('pages.clients.detailDescription')}
             </DialogDescription>
           </DialogHeader>
 
           {selectedClient && (
             <Tabs defaultValue="info" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="info">Informations</TabsTrigger>
+                <TabsTrigger value="info">{t('common.information')}</TabsTrigger>
                 <TabsTrigger value="commandes">
                   <ShoppingBag className="w-4 h-4 mr-2" />
-                  Commandes
+                  {t('common.orders')}
                 </TabsTrigger>
                 <TabsTrigger value="interactions">
                   <History className="w-4 h-4 mr-2" />
-                  Interactions
+                  {t('common.interactions')}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="info" className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-slate-500">Email</Label>
+                    <Label className="text-slate-500">{t('common.email')}</Label>
                     <p className="font-medium">{selectedClient.email}</p>
                   </div>
                   <div>
-                    <Label className="text-slate-500">Téléphone</Label>
+                    <Label className="text-slate-500">{t('common.phone')}</Label>
                     <p className="font-medium">{selectedClient.telephone}</p>
                   </div>
                   <div>
-                    <Label className="text-slate-500">Type</Label>
-                    <p className="font-medium">{selectedClient.type}</p>
+                    <Label className="text-slate-500">{t('common.type')}</Label>
+                    <p className="font-medium">{getClientTypeLabel(selectedClient.type)}</p>
                   </div>
                   <div>
-                    <Label className="text-slate-500">Entreprise</Label>
+                    <Label className="text-slate-500">{t('common.company')}</Label>
                     <p className="font-medium">{selectedClient.entreprise || '-'}</p>
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-slate-500">Adresse</Label>
+                    <Label className="text-slate-500">{t('common.address')}</Label>
                     <p className="font-medium">{selectedClient.adresse}</p>
                   </div>
                   <div>
-                    <Label className="text-slate-500">Date de création</Label>
+                    <Label className="text-slate-500">{t('pages.clients.createdAt')}</Label>
                     <p className="font-medium">
                       {new Date(selectedClient.dateCreation).toLocaleDateString('fr-FR')}
                     </p>
@@ -449,9 +449,9 @@ export function ClientsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>N°</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Statut</TableHead>
-                        <TableHead className="text-right">Montant</TableHead>
+                        <TableHead>{t('common.date')}</TableHead>
+                        <TableHead>{t('common.status')}</TableHead>
+                        <TableHead className="text-right">{t('common.amount')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -462,7 +462,7 @@ export function ClientsPage() {
                             {new Date(cmd.dateCommande).toLocaleDateString('fr-FR')}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">{cmd.statut}</Badge>
+                            <Badge variant="outline">{t(`statusLabels.order.${cmd.statut}`)}</Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             {cmd.montantTotal.toLocaleString('fr-FR')} €
@@ -472,7 +472,7 @@ export function ClientsPage() {
                     </TableBody>
                   </Table>
                 ) : (
-                  <p className="text-center text-slate-500 py-8">Aucune commande</p>
+                  <p className="text-center text-slate-500 py-8">{t('pages.clients.noOrders')}</p>
                 )}
               </TabsContent>
 
@@ -492,7 +492,7 @@ export function ClientsPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-slate-500 py-8">Aucune interaction</p>
+                  <p className="text-center text-slate-500 py-8">{t('pages.clients.noInteractions')}</p>
                 )}
               </TabsContent>
             </Tabs>
@@ -502,5 +502,3 @@ export function ClientsPage() {
     </div>
   );
 }
-
-

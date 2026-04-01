@@ -32,6 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Search, Download, FileText, TrendingUp, Users, Package } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart,
   Bar,
@@ -51,12 +52,6 @@ import html2canvas from 'html2canvas';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-const typeLabels: Record<TypeRapport, string> = {
-  [TypeRapport.VENTES]: 'Ventes',
-  [TypeRapport.CLIENTS]: 'Clients',
-  [TypeRapport.PERFORMANCE]: 'Performance',
-};
-
 const typeIcons = {
   [TypeRapport.VENTES]: TrendingUp,
   [TypeRapport.CLIENTS]: Users,
@@ -75,7 +70,10 @@ async function captureElement(el: HTMLElement): Promise<string> {
 }
 
 export function RapportsPage() {
+  const { t, i18n } = useTranslation();
   const { rapports, commandes, clients, produits, users, addRapport } = useStore();
+  const locale = i18n.language.startsWith('fr') ? 'fr-FR' : 'en-US';
+  const reportTypeLabel = (type: TypeRapport) => t(`statusLabels.reportType.${type}`);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('ventes');
@@ -97,23 +95,23 @@ export function RapportsPage() {
   });
 
   const filteredRapports = rapports.filter((r) =>
-    typeLabels[r.type].toLowerCase().includes(searchTerm.toLowerCase())
+    reportTypeLabel(r.type).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // ── Chart data ─────────────────────────────────────────────────────────────
 
   const ventesData = [
-    { mois: 'Jan', montant: 15000, commandes: 12 },
-    { mois: 'Fév', montant: 18000, commandes: 15 },
-    { mois: 'Mar', montant: 22000, commandes: 18 },
-    { mois: 'Avr', montant: 19000, commandes: 16 },
-    { mois: 'Mai', montant: 25000, commandes: 22 },
-    { mois: 'Juin', montant: 28000, commandes: 25 },
+    { mois: t('pages.reports.months.jan'), montant: 15000, commandes: 12 },
+    { mois: t('pages.reports.months.feb'), montant: 18000, commandes: 15 },
+    { mois: t('pages.reports.months.mar'), montant: 22000, commandes: 18 },
+    { mois: t('pages.reports.months.apr'), montant: 19000, commandes: 16 },
+    { mois: t('pages.reports.months.may'), montant: 25000, commandes: 22 },
+    { mois: t('pages.reports.months.jun'), montant: 28000, commandes: 25 },
   ];
 
   const clientTypeData = [
-    { name: 'Particuliers', value: clients.filter((c) => c.type === 'PARTICULIER').length },
-    { name: 'Entreprises',  value: clients.filter((c) => c.type === 'ENTREPRISE').length },
+    { name: t('pages.reports.individuals'), value: clients.filter((c) => c.type === 'PARTICULIER').length },
+    { name: t('pages.reports.businesses'),  value: clients.filter((c) => c.type === 'ENTREPRISE').length },
   ];
 
   const produitData = produits.slice(0, 5).map((p) => ({
@@ -158,7 +156,10 @@ export function RapportsPage() {
       const fromDate = new Date(rapport.periode.dateDebut);
       const toDate   = new Date(rapport.periode.dateFin);
       toDate.setHours(23, 59, 59, 999);
-      const periodLabel = `Du ${fromDate.toLocaleDateString('fr-FR')} au ${toDate.toLocaleDateString('fr-FR')}`;
+      const periodLabel = t('pages.reports.periodLabel', {
+        from: fromDate.toLocaleDateString(locale),
+        to: toDate.toLocaleDateString(locale),
+      });
 
       // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -182,7 +183,7 @@ export function RapportsPage() {
         pdf.setFontSize(7.5);
         pdf.setTextColor(...GRAY);
         pdf.setFont('helvetica', 'normal');
-        pdf.text('Rapport confidentiel • Généré automatiquement', M, PH - 8);
+        pdf.text(t('pages.reports.pdf.confidential'), M, PH - 8);
         pdf.text(`Page ${pageNum} / ${total}`, PW - M, PH - 8, { align: 'right' });
       };
 
@@ -274,14 +275,14 @@ export function RapportsPage() {
       pdf.setTextColor(...WHITE);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(26);
-      pdf.text(`Rapport ${typeLabels[rapport.type]}`, M, 42);
+      pdf.text(`${t('navigation.reports')} ${reportTypeLabel(rapport.type)}`, M, 42);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(12);
       pdf.setTextColor(196, 215, 255);
       pdf.text(periodLabel, M, 56);
       pdf.setFontSize(9);
       pdf.setTextColor(160, 195, 255);
-      pdf.text(`Généré le ${new Date(rapport.dateGeneration).toLocaleDateString('fr-FR')}`, M, 68);
+      pdf.text(`${t('common.generatedOn')} ${new Date(rapport.dateGeneration).toLocaleDateString(locale)}`, M, 68);
 
       pdf.setFillColor(...WHITE);
       pdf.roundedRect(M, 100, PW - M * 2, 70, 5, 5, 'F');
@@ -291,12 +292,12 @@ export function RapportsPage() {
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(...DARK);
-      pdf.text('Informations', M + 8, 114);
+      pdf.text(t('common.information'), M + 8, 114);
       [
-        ['Type de rapport',    typeLabels[rapport.type]],
-        ['Identifiant',        rapport.id],
-        ['Période couverte',   periodLabel],
-        ['Date de génération', new Date(rapport.dateGeneration).toLocaleDateString('fr-FR')],
+        [t('pages.reports.pdf.reportType'), reportTypeLabel(rapport.type)],
+        [t('pages.reports.pdf.identifier'), rapport.id],
+        [t('pages.reports.pdf.coveredPeriod'), periodLabel],
+        [t('pages.reports.generatedDate'), new Date(rapport.dateGeneration).toLocaleDateString(locale)],
       ].forEach(([k, v], i) => {
         const iy = 124 + i * 11;
         pdf.setFont('helvetica', 'normal');
@@ -326,18 +327,18 @@ export function RapportsPage() {
           (c) => new Date(c.dateCommande).getMonth() === new Date().getMonth()
         ).length;
 
-        addHeader('Analyse des Ventes', periodLabel);
+        addHeader(t('pages.reports.pdf.salesAnalysis'), periodLabel);
         addKpis([
-          { label: "Chiffre d'affaires", value: `${totalRevenue.toLocaleString('fr-FR')} €`,        color: [37, 99, 235]  },
-          { label: 'Commandes',          value: String(periodOrders.length),                          color: [16, 185, 129] },
-          { label: 'Panier moyen',       value: `${Math.round(avgOrder).toLocaleString('fr-FR')} €`, color: [139, 92, 246] },
-          { label: 'Ce mois',            value: String(thisMonth),                                    color: [245, 158, 11] },
+          { label: t('pages.reports.totalRevenue'), value: `${totalRevenue.toLocaleString(locale)} €`, color: [37, 99, 235] },
+          { label: t('pages.reports.orderCountLabel'), value: String(periodOrders.length), color: [16, 185, 129] },
+          { label: t('pages.reports.avgBasket'), value: `${Math.round(avgOrder).toLocaleString(locale)} €`, color: [139, 92, 246] },
+          { label: t('pages.reports.pdf.thisMonth'), value: String(thisMonth), color: [245, 158, 11] },
         ], 44);
 
-        addSectionLabel('Évolution des ventes', 74);
+        addSectionLabel(t('pages.reports.salesEvolution'), 74);
         let nextY = addChartImage(imgVentesLine, captureVentesLineRef.current, M, 78, PW - M * 2, 68);
 
-        addSectionLabel('Nombre de commandes', nextY + 6);
+        addSectionLabel(t('pages.reports.orderCount'), nextY + 6);
         addChartImage(imgVentesBar, captureVentesBarRef.current, M, nextY + 10, PW - M * 2, 68);
 
         addFooter(2, 3);
@@ -345,20 +346,20 @@ export function RapportsPage() {
         pdf.addPage();
         pdf.setFillColor(...WHITE);
         pdf.rect(0, 0, PW, PH, 'F');
-        addHeader('Détail des Commandes', periodLabel);
-        addSectionLabel('Liste des commandes de la période', 46);
+        addHeader(t('pages.reports.pdf.orderDetails'), periodLabel);
+        addSectionLabel(t('pages.reports.pdf.ordersInPeriod'), 46);
         const tableRows = periodOrders.slice(0, 28).map((c) => [
           c.id.slice(0, 10),
-          new Date(c.dateCommande).toLocaleDateString('fr-FR'),
+          new Date(c.dateCommande).toLocaleDateString(locale),
           c.statut,
           c.clientId?.slice(0, 10) || '—',
           `${c.montantTotal.toFixed(2)} €`,
         ]);
-        const afterTable = addDataTable(['ID Commande', 'Date', 'Statut', 'Client ID', 'Montant'], tableRows, 50);
+        const afterTable = addDataTable([t('pages.reports.pdf.orderId'), t('common.date'), t('common.status'), t('pages.reports.pdf.clientId'), t('common.amount')], tableRows, 50);
         if (periodOrders.length > 28) {
           pdf.setFontSize(7.5);
           pdf.setTextColor(...GRAY);
-          pdf.text(`+ ${periodOrders.length - 28} commande(s) non affichée(s)`, M, afterTable + 5);
+          pdf.text(t('pages.reports.pdf.hiddenOrders', { count: periodOrders.length - 28 }), M, afterTable + 5);
         }
         addFooter(3, 3);
 
@@ -368,15 +369,15 @@ export function RapportsPage() {
           return d >= fromDate && d <= toDate;
         });
 
-        addHeader('Analyse des Clients', periodLabel);
+        addHeader(t('pages.reports.pdf.clientAnalysis'), periodLabel);
         addKpis([
-          { label: 'Total clients', value: String(clients.length),                                      color: [37,  99,  235] },
-          { label: 'Nouveaux',      value: String(periodClients.length),                                 color: [16,  185, 129] },
-          { label: 'Particuliers',  value: String(clients.filter(c => c.type === 'PARTICULIER').length), color: [139, 92,  246] },
-          { label: 'Entreprises',   value: String(clients.filter(c => c.type === 'ENTREPRISE').length),  color: [245, 158, 11]  },
+          { label: t('pages.reports.totalClients'), value: String(clients.length), color: [37, 99, 235] },
+          { label: t('pages.reports.pdf.newClients'), value: String(periodClients.length), color: [16, 185, 129] },
+          { label: t('pages.reports.individuals'), value: String(clients.filter(c => c.type === 'PARTICULIER').length), color: [139, 92, 246] },
+          { label: t('pages.reports.businesses'), value: String(clients.filter(c => c.type === 'ENTREPRISE').length), color: [245, 158, 11] },
         ], 44);
 
-        addSectionLabel('Répartition par type', 74);
+        addSectionLabel(t('pages.reports.clientDistribution'), 74);
         addChartImage(imgClientsPie, captureClientsPieRef.current, M, 78, PW - M * 2, 100);
 
         addFooter(2, 3);
@@ -384,16 +385,16 @@ export function RapportsPage() {
         pdf.addPage();
         pdf.setFillColor(...WHITE);
         pdf.rect(0, 0, PW, PH, 'F');
-        addHeader('Liste des Clients', periodLabel);
-        addSectionLabel('Clients créés sur la période', 46);
+        addHeader(t('pages.reports.pdf.clientList'), periodLabel);
+        addSectionLabel(t('pages.reports.pdf.clientsInPeriod'), 46);
         addDataTable(
-          ['Nom', 'Email', 'Type', 'Entreprise', 'Date création'],
+          [t('common.name'), t('common.email'), t('common.type'), t('common.company'), t('pages.reports.pdf.creationDate')],
           periodClients.slice(0, 28).map((c) => [
             `${c.prenom} ${c.nom}`,
             c.email,
             c.type,
             c.entreprise || '—',
-            new Date(c.dateCreation).toLocaleDateString('fr-FR'),
+            new Date(c.dateCreation).toLocaleDateString(locale),
           ]),
           50
         );
@@ -407,22 +408,22 @@ export function RapportsPage() {
         const userMap = new Map(users.map(u => [u.id, `${u.prenom} ${u.nom}`]));
         const grouped = new Map<string, { count: number; amount: number; name: string }>();
         for (const order of periodOrders) {
-          const cur = grouped.get(order.userId) || { count: 0, amount: 0, name: userMap.get(order.userId) || 'Inconnu' };
+          const cur = grouped.get(order.userId) || { count: 0, amount: 0, name: userMap.get(order.userId) || t('pages.reports.pdf.unknownEmployee') };
           grouped.set(order.userId, { ...cur, count: cur.count + 1, amount: cur.amount + order.montantTotal });
         }
         const perfData = Array.from(grouped.values()).sort((a, b) => b.amount - a.amount);
 
-        addHeader('Rapport de Performance', periodLabel);
+        addHeader(t('pages.reports.performanceReport'), periodLabel);
         addKpis([
-          { label: 'Employés actifs',    value: String(perfData.length),                                                             color: [37,  99,  235] },
-          { label: 'Commandes traitées', value: String(periodOrders.length),                                                         color: [16,  185, 129] },
-          { label: 'CA total',           value: `${periodOrders.reduce((s, c) => s + c.montantTotal, 0).toLocaleString('fr-FR')} €`, color: [139, 92,  246] },
+          { label: t('pages.reports.pdf.activeEmployees'), value: String(perfData.length), color: [37, 99, 235] },
+          { label: t('pages.reports.pdf.processedOrders'), value: String(periodOrders.length), color: [16, 185, 129] },
+          { label: t('pages.reports.pdf.totalTurnover'), value: `${periodOrders.reduce((s, c) => s + c.montantTotal, 0).toLocaleString(locale)} €`, color: [139, 92, 246] },
         ], 44);
 
-        addSectionLabel('Performance par employé', 74);
+        addSectionLabel(t('pages.reports.employeePerformance'), 74);
         const nextY = addChartImage(imgPerfBar, capturePerfBarRef.current, M, 78, PW - M * 2, 68);
 
-        addSectionLabel('Top produits', nextY + 6);
+        addSectionLabel(t('pages.reports.topProducts'), nextY + 6);
         addChartImage(imgProduitBar, captureProduitBarRef.current, M, nextY + 10, PW - M * 2, 68);
 
         addFooter(2, 3);
@@ -430,10 +431,10 @@ export function RapportsPage() {
         pdf.addPage();
         pdf.setFillColor(...WHITE);
         pdf.rect(0, 0, PW, PH, 'F');
-        addHeader('Classement des Employés', periodLabel);
-        addSectionLabel('Détail par employé', 46);
+        addHeader(t('pages.reports.pdf.employeeRanking'), periodLabel);
+        addSectionLabel(t('pages.reports.pdf.employeeDetails'), 46);
         addDataTable(
-          ['#', 'Employé', 'Commandes', 'CA Total', 'Panier moy.'],
+          ['#', t('common.employee'), t('pages.reports.orderCountLabel'), t('pages.reports.pdf.totalTurnover'), t('pages.reports.avgBasket')],
           perfData.map((e, i) => [
             String(i + 1),
             e.name,
@@ -446,11 +447,11 @@ export function RapportsPage() {
         addFooter(3, 3);
       }
 
-      pdf.save(`Rapport-${typeLabels[rapport.type]}-${rapport.id}.pdf`);
-      toast.success('Rapport PDF téléchargé avec succès');
+      pdf.save(`Report-${reportTypeLabel(rapport.type)}-${rapport.id}.pdf`);
+      toast.success(t('pages.reports.downloadSuccess'));
     } catch (err) {
       console.error(err);
-      toast.error('Échec du téléchargement du rapport');
+      toast.error(t('pages.reports.downloadError'));
     } finally {
       setDownloadingId(null);
     }
@@ -465,9 +466,9 @@ export function RapportsPage() {
         userId: '1',
       });
       setIsAddDialogOpen(false);
-      toast.success('Rapport généré avec succès');
+      toast.success(t('pages.reports.generateSuccess'));
     } catch {
-      toast.error('Échec de génération du rapport');
+      toast.error(t('pages.reports.generateError'));
     }
   };
 
@@ -501,7 +502,7 @@ export function RapportsPage() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="mois" />
               <YAxis />
-              <Tooltip formatter={(v: number) => `${v.toLocaleString('fr-FR')} €`} />
+              <Tooltip formatter={(v: number) => `${v.toLocaleString(locale)} €`} />
               <Line type="monotone" dataKey="montant" stroke="#3b82f6" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
@@ -557,7 +558,7 @@ export function RapportsPage() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" />
               <YAxis dataKey="name" type="category" width={120} />
-              <Tooltip formatter={(v: number) => `${v.toLocaleString('fr-FR')} €`} />
+              <Tooltip formatter={(v: number) => `${v.toLocaleString(locale)} €`} />
               <Bar dataKey="montant" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -581,39 +582,39 @@ export function RapportsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Rapports et analyses</h1>
-          <p className="text-slate-500">Générez et consultez vos rapports</p>
+          <h1 className="text-2xl font-bold text-slate-800">{t('pages.reports.title')}</h1>
+          <p className="text-slate-500">{t('pages.reports.subtitle')}</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
               <Plus className="w-4 h-4 mr-2" />
-              Générer un rapport
+              {t('pages.reports.generate')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Générer un rapport</DialogTitle>
-              <DialogDescription>Sélectionnez le type de rapport et la période</DialogDescription>
+              <DialogTitle>{t('pages.reports.generateTitle')}</DialogTitle>
+              <DialogDescription>{t('pages.reports.generateDescription')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="type">Type de rapport</Label>
+                <Label htmlFor="type">{t('pages.reports.type')}</Label>
                 <Select
                   value={formData.type}
                   onValueChange={(value) => setFormData({ ...formData, type: value as TypeRapport })}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="VENTES">Rapport des ventes</SelectItem>
-                    <SelectItem value="CLIENTS">Rapport des clients</SelectItem>
-                    <SelectItem value="PERFORMANCE">Rapport de performance</SelectItem>
+                    <SelectItem value="VENTES">{t('pages.reports.salesReport')}</SelectItem>
+                    <SelectItem value="CLIENTS">{t('pages.reports.clientsReport')}</SelectItem>
+                    <SelectItem value="PERFORMANCE">{t('pages.reports.performanceReport')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="dateDebut">Date début</Label>
+                  <Label htmlFor="dateDebut">{t('pages.reports.startDate')}</Label>
                   <Input
                     id="dateDebut"
                     type="date"
@@ -624,7 +625,7 @@ export function RapportsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="dateFin">Date fin</Label>
+                  <Label htmlFor="dateFin">{t('pages.reports.endDate')}</Label>
                   <Input
                     id="dateFin"
                     type="date"
@@ -637,8 +638,8 @@ export function RapportsPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Annuler</Button>
-              <Button onClick={handleGenerate} className="bg-blue-600 hover:bg-blue-700">Générer</Button>
+              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>{t('common.cancel')}</Button>
+              <Button onClick={handleGenerate} className="bg-blue-600 hover:bg-blue-700">{t('pages.reports.generate')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -646,23 +647,23 @@ export function RapportsPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="ventes"><TrendingUp className="w-4 h-4 mr-2" />Ventes</TabsTrigger>
-          <TabsTrigger value="clients"><Users className="w-4 h-4 mr-2" />Clients</TabsTrigger>
-          <TabsTrigger value="performance"><Package className="w-4 h-4 mr-2" />Performance</TabsTrigger>
+          <TabsTrigger value="ventes"><TrendingUp className="w-4 h-4 mr-2" />{reportTypeLabel(TypeRapport.VENTES)}</TabsTrigger>
+          <TabsTrigger value="clients"><Users className="w-4 h-4 mr-2" />{reportTypeLabel(TypeRapport.CLIENTS)}</TabsTrigger>
+          <TabsTrigger value="performance"><Package className="w-4 h-4 mr-2" />{reportTypeLabel(TypeRapport.PERFORMANCE)}</TabsTrigger>
         </TabsList>
 
         {/* VENTES */}
         <TabsContent value="ventes" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader><CardTitle>Évolution des ventes</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('pages.reports.salesEvolution')}</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={ventesData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="mois" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => `${value.toLocaleString('fr-FR')} €`} />
+                    <Tooltip formatter={(value: number) => `${value.toLocaleString(locale)} €`} />
                     <Line type="monotone" dataKey="montant" stroke="#3b82f6" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -670,7 +671,7 @@ export function RapportsPage() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Nombre de commandes</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('pages.reports.orderCount')}</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={ventesData}>
@@ -686,29 +687,29 @@ export function RapportsPage() {
           </div>
 
           <Card>
-            <CardHeader><CardTitle>Résumé des ventes</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t('pages.reports.salesSummary')}</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-4 bg-slate-50 rounded-lg">
-                  <p className="text-sm text-slate-500">Chiffre d'affaires total</p>
+                  <p className="text-sm text-slate-500">{t('pages.reports.totalRevenue')}</p>
                   <p className="text-2xl font-bold">
-                    {commandes.reduce((sum, c) => sum + c.montantTotal, 0).toLocaleString('fr-FR')} €
+                    {commandes.reduce((sum, c) => sum + c.montantTotal, 0).toLocaleString(locale)} €
                   </p>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg">
-                  <p className="text-sm text-slate-500">Nombre de commandes</p>
+                  <p className="text-sm text-slate-500">{t('pages.reports.orderCountLabel')}</p>
                   <p className="text-2xl font-bold">{commandes.length}</p>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg">
-                  <p className="text-sm text-slate-500">Panier moyen</p>
+                  <p className="text-sm text-slate-500">{t('pages.reports.avgBasket')}</p>
                   <p className="text-2xl font-bold">
                     {commandes.length > 0
-                      ? Math.round(commandes.reduce((sum, c) => sum + c.montantTotal, 0) / commandes.length).toLocaleString('fr-FR')
+                      ? Math.round(commandes.reduce((sum, c) => sum + c.montantTotal, 0) / commandes.length).toLocaleString(locale)
                       : 0} €
                   </p>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg">
-                  <p className="text-sm text-slate-500">Commandes ce mois</p>
+                  <p className="text-sm text-slate-500">{t('pages.reports.currentMonthOrders')}</p>
                   <p className="text-2xl font-bold">
                     {commandes.filter((c) => new Date(c.dateCommande).getMonth() === new Date().getMonth()).length}
                   </p>
@@ -722,7 +723,7 @@ export function RapportsPage() {
         <TabsContent value="clients" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader><CardTitle>Répartition par type</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('pages.reports.clientDistribution')}</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -754,19 +755,19 @@ export function RapportsPage() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Statistiques clients</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('pages.reports.clientStats')}</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm text-slate-500">Total clients</p>
+                    <p className="text-sm text-slate-500">{t('pages.reports.totalClients')}</p>
                     <p className="text-2xl font-bold">{clients.length}</p>
                   </div>
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm text-slate-500">Particuliers</p>
+                    <p className="text-sm text-slate-500">{t('pages.reports.individuals')}</p>
                     <p className="text-2xl font-bold">{clients.filter((c) => c.type === 'PARTICULIER').length}</p>
                   </div>
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm text-slate-500">Entreprises</p>
+                    <p className="text-sm text-slate-500">{t('pages.reports.businesses')}</p>
                     <p className="text-2xl font-bold">{clients.filter((c) => c.type === 'ENTREPRISE').length}</p>
                   </div>
                 </div>
@@ -778,14 +779,14 @@ export function RapportsPage() {
         {/* PERFORMANCE */}
         <TabsContent value="performance" className="space-y-6">
           <Card>
-            <CardHeader><CardTitle>Performance par employé</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t('pages.reports.employeePerformance')}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={performanceData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
                   <YAxis dataKey="name" type="category" width={120} />
-                  <Tooltip formatter={(value: number) => `${value.toLocaleString('fr-FR')} €`} />
+                  <Tooltip formatter={(value: number) => `${value.toLocaleString(locale)} €`} />
                   <Bar dataKey="montant" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -793,7 +794,7 @@ export function RapportsPage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Top produits</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t('pages.reports.topProducts')}</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={produitData}>
@@ -813,11 +814,11 @@ export function RapportsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Rapports générés</CardTitle>
+            <CardTitle>{t('pages.reports.generatedReports')}</CardTitle>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Rechercher..."
+                placeholder={t('common.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -830,10 +831,10 @@ export function RapportsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Date de génération</TableHead>
-                  <TableHead>Période</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('pages.reports.type')}</TableHead>
+                  <TableHead>{t('pages.reports.generatedDate')}</TableHead>
+                  <TableHead>{t('common.period')}</TableHead>
+                  <TableHead className="text-right">{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -845,15 +846,17 @@ export function RapportsPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Icon className="w-4 h-4 text-blue-600" />
-                          <span className="font-medium">{typeLabels[rapport.type]}</span>
+                          <span className="font-medium">{reportTypeLabel(rapport.type)}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        {new Date(rapport.dateGeneration).toLocaleDateString('fr-FR')}
+                        {new Date(rapport.dateGeneration).toLocaleDateString(locale)}
                       </TableCell>
                       <TableCell>
-                        Du {new Date(rapport.periode.dateDebut).toLocaleDateString('fr-FR')} au{' '}
-                        {new Date(rapport.periode.dateFin).toLocaleDateString('fr-FR')}
+                        {t('pages.reports.periodLabel', {
+                          from: new Date(rapport.periode.dateDebut).toLocaleDateString(locale),
+                          to: new Date(rapport.periode.dateFin).toLocaleDateString(locale),
+                        })}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -861,7 +864,7 @@ export function RapportsPage() {
                           size="icon"
                           onClick={() => handleDownloadReport(rapport)}
                           disabled={isLoading}
-                          aria-label={`Télécharger ${typeLabels[rapport.type]}`}
+                          aria-label={t('pages.reports.reportDownloadLabel', { type: reportTypeLabel(rapport.type) })}
                         >
                           {isLoading ? (
                             <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -878,8 +881,8 @@ export function RapportsPage() {
           ) : (
             <div className="text-center py-8 text-slate-500">
               <FileText className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-              <p>Aucun rapport généré</p>
-              <p className="text-sm">Générez votre premier rapport en cliquant sur le bouton ci-dessus</p>
+              <p>{t('pages.reports.noReports')}</p>
+              <p className="text-sm">{t('pages.reports.noReportsHint')}</p>
             </div>
           )}
         </CardContent>

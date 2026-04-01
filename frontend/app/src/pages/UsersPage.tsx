@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store';
 import { UserRole } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function UsersPage() {
+  const { t } = useTranslation();
   const { users, addUser, updateUser, deleteUser } = useStore();
   const { user: currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,42 +77,44 @@ export function UsersPage() {
         role: UserRole.EMPLOYE,
         actif: true,
       });
-      toast.success('Utilisateur créé avec succès');
+      toast.success(t('pages.users.createSuccess'));
     } catch {
-      toast.error("Échec de création de l'utilisateur");
+      toast.error(t('pages.users.createError'));
     }
   };
 
   const handleEdit = async () => {
-    if (selectedUser) {
-      const updatePayload = {
-        nom: formData.nom,
-        prenom: formData.prenom,
-        email: formData.email,
-        role: formData.role,
-        actif: formData.actif,
-        ...(formData.password ? { password: formData.password } : {}),
-      };
+    if (!selectedUser) return;
 
-      try {
-        await updateUser(String(selectedUser.id), updatePayload);
-        setIsEditDialogOpen(false);
-        setSelectedUser(null);
-        toast.success('Utilisateur mis à jour avec succès');
-      } catch {
-        toast.error("Échec de mise à jour de l'utilisateur");
-      }
+    const updatePayload = {
+      nom: formData.nom,
+      prenom: formData.prenom,
+      email: formData.email,
+      role: formData.role,
+      actif: formData.actif,
+      ...(formData.password ? { password: formData.password } : {}),
+    };
+
+    try {
+      await updateUser(String(selectedUser.id), updatePayload);
+      setIsEditDialogOpen(false);
+      setSelectedUser(null);
+      toast.success(t('pages.users.updateSuccess'));
+    } catch {
+      toast.error(t('pages.users.updateError'));
     }
   };
 
   const handleDelete = async (id: string | number) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
-      try {
-        await deleteUser(String(id));
-        toast.success('Utilisateur supprimé avec succès');
-      } catch {
-        toast.error("Échec de suppression de l'utilisateur");
-      }
+    if (!confirm(t('pages.users.deleteConfirm'))) {
+      return;
+    }
+
+    try {
+      await deleteUser(String(id));
+      toast.success(t('pages.users.deleteSuccess'));
+    } catch {
+      toast.error(t('pages.users.deleteError'));
     }
   };
 
@@ -144,27 +148,25 @@ export function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Gestion des utilisateurs</h1>
-          <p className="text-slate-500">Créer, modifier et gérer les comptes utilisateurs</p>
+          <h1 className="text-2xl font-bold text-slate-800">{t('pages.users.title')}</h1>
+          <p className="text-slate-500">{t('pages.users.subtitle')}</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Nouvel utilisateur
+              <Plus className="mr-2 h-4 w-4" />
+              {t('pages.users.new')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Créer un utilisateur</DialogTitle>
-              <DialogDescription>
-                Remplissez les informations pour créer un nouvel utilisateur
-              </DialogDescription>
+              <DialogTitle>{t('pages.users.createTitle')}</DialogTitle>
+              <DialogDescription>{t('pages.users.createDescription')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="prenom">Prénom</Label>
+                  <Label htmlFor="prenom">{t('common.firstName')}</Label>
                   <Input
                     id="prenom"
                     value={formData.prenom}
@@ -172,7 +174,7 @@ export function UsersPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nom">Nom</Label>
+                  <Label htmlFor="nom">{t('common.name')}</Label>
                   <Input
                     id="nom"
                     value={formData.nom}
@@ -181,7 +183,7 @@ export function UsersPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('common.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -190,7 +192,7 @@ export function UsersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Mot de passe</Label>
+                <Label htmlFor="password">{t('pages.users.password')}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -199,7 +201,7 @@ export function UsersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="role">Rôle</Label>
+                <Label htmlFor="role">{t('common.role')}</Label>
                 <Select
                   value={formData.role}
                   onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
@@ -207,24 +209,24 @@ export function UsersPage() {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                <SelectContent>
+                  <SelectContent>
                     {assignableRoles.includes(UserRole.ADMIN) && (
-                      <SelectItem value="ADMIN">Administrateur</SelectItem>
+                      <SelectItem value="ADMIN">{t('statusLabels.role.ADMIN')}</SelectItem>
                     )}
                     {assignableRoles.includes(UserRole.SUPERVISEUR) && (
-                      <SelectItem value="SUPERVISEUR">Superviseur</SelectItem>
+                      <SelectItem value="SUPERVISEUR">{t('statusLabels.role.SUPERVISEUR')}</SelectItem>
                     )}
-                    <SelectItem value="EMPLOYE">Employé</SelectItem>
+                    <SelectItem value="EMPLOYE">{t('statusLabels.role.EMPLOYE')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700">
-                Créer
+                {t('common.create')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -234,10 +236,10 @@ export function UsersPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <div className="relative max-w-sm flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
-                placeholder="Rechercher un utilisateur..."
+                placeholder={t('pages.users.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -249,12 +251,12 @@ export function UsersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Rôle</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Date de création</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t('common.name')}</TableHead>
+                <TableHead>{t('common.email')}</TableHead>
+                <TableHead>{t('common.role')}</TableHead>
+                <TableHead>{t('common.status')}</TableHead>
+                <TableHead>{t('pages.users.createdAt')}</TableHead>
+                <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -265,32 +267,28 @@ export function UsersPage() {
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <Badge className={getRoleBadgeColor(user.role)}>{user.role}</Badge>
+                    <Badge className={getRoleBadgeColor(user.role)}>
+                      {t(`statusLabels.role.${user.role}`)}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     {user.actif ? (
                       <div className="flex items-center gap-1 text-green-600">
-                        <UserCheck className="w-4 h-4" />
-                        <span className="text-sm">Actif</span>
+                        <UserCheck className="h-4 w-4" />
+                        <span className="text-sm">{t('common.active')}</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1 text-red-600">
-                        <UserX className="w-4 h-4" />
-                        <span className="text-sm">Inactif</span>
+                        <UserX className="h-4 w-4" />
+                        <span className="text-sm">{t('common.inactive')}</span>
                       </div>
                     )}
                   </TableCell>
-                  <TableCell>
-                    {new Date(user.dateCreation).toLocaleDateString('fr-FR')}
-                  </TableCell>
+                  <TableCell>{new Date(user.dateCreation).toLocaleDateString('fr-FR')}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(user)}
-                      >
-                        <Edit2 className="w-4 h-4" />
+                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(user)}>
+                        <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -298,7 +296,7 @@ export function UsersPage() {
                         onClick={() => handleDelete(user.id)}
                         className="text-red-600 hover:text-red-700"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -309,19 +307,16 @@ export function UsersPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Modifier l'utilisateur</DialogTitle>
-            <DialogDescription>
-              Modifiez les informations de l'utilisateur
-            </DialogDescription>
+            <DialogTitle>{t('pages.users.editTitle')}</DialogTitle>
+            <DialogDescription>{t('pages.users.editDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-prenom">Prénom</Label>
+                <Label htmlFor="edit-prenom">{t('common.firstName')}</Label>
                 <Input
                   id="edit-prenom"
                   value={formData.prenom}
@@ -329,7 +324,7 @@ export function UsersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-nom">Nom</Label>
+                <Label htmlFor="edit-nom">{t('common.name')}</Label>
                 <Input
                   id="edit-nom"
                   value={formData.nom}
@@ -338,7 +333,7 @@ export function UsersPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
+              <Label htmlFor="edit-email">{t('common.email')}</Label>
               <Input
                 id="edit-email"
                 type="email"
@@ -347,7 +342,7 @@ export function UsersPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-role">Rôle</Label>
+              <Label htmlFor="edit-role">{t('common.role')}</Label>
               <Select
                 value={formData.role}
                 onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
@@ -357,17 +352,17 @@ export function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {assignableRoles.includes(UserRole.ADMIN) && (
-                    <SelectItem value="ADMIN">Administrateur</SelectItem>
+                    <SelectItem value="ADMIN">{t('statusLabels.role.ADMIN')}</SelectItem>
                   )}
                   {assignableRoles.includes(UserRole.SUPERVISEUR) && (
-                    <SelectItem value="SUPERVISEUR">Superviseur</SelectItem>
+                    <SelectItem value="SUPERVISEUR">{t('statusLabels.role.SUPERVISEUR')}</SelectItem>
                   )}
-                  <SelectItem value="EMPLOYE">Employé</SelectItem>
+                  <SelectItem value="EMPLOYE">{t('statusLabels.role.EMPLOYE')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-actif">Statut</Label>
+              <Label htmlFor="edit-actif">{t('common.status')}</Label>
               <Select
                 value={formData.actif ? 'actif' : 'inactif'}
                 onValueChange={(value) => setFormData({ ...formData, actif: value === 'actif' })}
@@ -376,18 +371,18 @@ export function UsersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="actif">Actif</SelectItem>
-                  <SelectItem value="inactif">Inactif</SelectItem>
+                  <SelectItem value="actif">{t('common.active')}</SelectItem>
+                  <SelectItem value="inactif">{t('common.inactive')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleEdit} className="bg-blue-600 hover:bg-blue-700">
-              Enregistrer
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

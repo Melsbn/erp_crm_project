@@ -30,10 +30,10 @@ function AssistantContent({ content }: { content: string }) {
       remarkPlugins={[remarkGfm]}
       components={{
         p: ({ children }) => (
-          <p className="mb-1 last:mb-0">{children}</p>
+          <p className="mb-1 last:mb-0 text-foreground">{children}</p>
         ),
         strong: ({ children }) => (
-          <strong className="font-semibold text-slate-900">{children}</strong>
+          <strong className="font-semibold text-foreground">{children}</strong>
         ),
         ul: ({ children }) => (
           <ul className="mt-1 mb-1 space-y-0.5 list-none pl-0">{children}</ul>
@@ -48,40 +48,40 @@ function AssistantContent({ content }: { content: string }) {
           </li>
         ),
         h1: ({ children }) => (
-          <h1 className="font-bold text-slate-800 text-sm mb-1">{children}</h1>
+          <h1 className="mb-1 text-sm font-bold text-foreground">{children}</h1>
         ),
         h2: ({ children }) => (
-          <h2 className="font-semibold text-slate-800 text-sm mb-1">{children}</h2>
+          <h2 className="mb-1 text-sm font-semibold text-foreground">{children}</h2>
         ),
         h3: ({ children }) => (
-          <h3 className="font-semibold text-slate-700 text-sm mb-0.5">{children}</h3>
+          <h3 className="mb-0.5 text-sm font-semibold text-foreground">{children}</h3>
         ),
         code: ({ children }) => (
-          <code className="bg-slate-200 rounded px-1 text-xs font-mono">{children}</code>
+          <code className="rounded bg-muted px-1 text-xs font-mono text-foreground">{children}</code>
         ),
-        hr: () => <hr className="border-slate-200 my-2" />,
+        hr: () => <hr className="my-2 border-border" />,
         // ── Tables ────────────────────────────────────────────────
         table: ({ children }) => (
-          <div className="overflow-x-auto my-2 rounded-lg border border-slate-200 w-full">
+          <div className="my-2 w-full overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-xs border-collapse">{children}</table>
           </div>
         ),
         thead: ({ children }) => (
-          <thead className="bg-blue-50 text-slate-700">{children}</thead>
+          <thead className="bg-blue-50 text-slate-700 dark:bg-slate-800 dark:text-slate-100">{children}</thead>
         ),
         tbody: ({ children }) => (
-          <tbody className="divide-y divide-slate-100">{children}</tbody>
+          <tbody className="divide-y divide-border">{children}</tbody>
         ),
         tr: ({ children }) => (
-          <tr className="hover:bg-slate-50 transition-colors">{children}</tr>
+          <tr className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/70">{children}</tr>
         ),
         th: ({ children }) => (
-          <th className="text-left px-2 py-2 font-semibold text-slate-700 border-b border-slate-200">
+          <th className="border-b border-border px-2 py-2 text-left font-semibold text-slate-700 dark:text-slate-100">
             {children}
           </th>
         ),
         td: ({ children }) => (
-          <td className="px-2 py-1.5 text-slate-600 break-words max-w-[120px]">{children}</td>
+          <td className="max-w-[120px] break-words px-2 py-1.5 text-slate-600 dark:text-slate-300">{children}</td>
         ),
       }}
     >
@@ -150,7 +150,7 @@ export function ChatbotWidget() {
     <>
       {isOpen && (
         <div className="fixed bottom-24 right-6 z-50 w-[420px] max-w-[calc(100vw-3rem)]">
-          <div className="rounded-2xl shadow-2xl overflow-hidden border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
 
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500">
@@ -181,7 +181,7 @@ export function ChatbotWidget() {
             </div>
 
             {/* Messages */}
-            <ScrollArea className="h-[440px] bg-slate-50">
+            <ScrollArea className="h-[440px] bg-slate-50 dark:bg-slate-900">
               <div className="px-3 py-4 space-y-4">
                 {messages.map((message) => (
                   <div
@@ -198,7 +198,7 @@ export function ChatbotWidget() {
                       className={`min-w-0 rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm overflow-hidden ${
                         message.role === 'user'
                           ? 'max-w-[75%] bg-blue-600 text-white rounded-br-sm break-words'
-                          : 'w-full bg-white text-slate-700 rounded-bl-sm border border-slate-100'
+                          : 'w-full rounded-bl-sm border border-slate-100 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100'
                       }`}
                     >
                       {message.role === 'assistant' ? (
@@ -211,7 +211,7 @@ export function ChatbotWidget() {
                         <img
                           src={message.chart}
                           alt="Graphique"
-                          className="mt-2 rounded-lg w-full border border-slate-100"
+                          className="mt-2 w-full rounded-lg border border-slate-100 dark:border-slate-800"
                         />
                       )}
                     </div>
@@ -224,7 +224,7 @@ export function ChatbotWidget() {
                     <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                       <Bot className="h-3.5 w-3.5 text-blue-600" />
                     </div>
-                    <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
+                    <div className="rounded-2xl rounded-bl-sm border border-slate-100 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
                       <div className="flex gap-1 items-center">
                         <span className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:0ms]" />
                         <span className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:150ms]" />
@@ -239,14 +239,14 @@ export function ChatbotWidget() {
             </ScrollArea>
 
             {/* Input */}
-            <form onSubmit={handleSend} className="border-t border-slate-100 p-3 bg-white">
+            <form onSubmit={handleSend} className="border-t border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
               <div className="flex items-center gap-2">
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Écrire un message..."
                   disabled={loading}
-                  className="flex-1 rounded-full border-slate-200 bg-slate-50 focus:bg-white text-sm px-4"
+                  className="flex-1 rounded-full border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 placeholder:text-slate-500 focus:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:bg-slate-950"
                 />
                 <Button
                   type="submit"

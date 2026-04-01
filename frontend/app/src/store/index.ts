@@ -37,6 +37,7 @@ interface DataActions {
   fetchProducts: () => Promise<void>;
   fetchCategories: () => Promise<void>;
   fetchOrders: () => Promise<void>;
+  fetchOrderLines: () => Promise<void>;
   fetchInvoices: () => Promise<void>;
   fetchInteractions: () => Promise<void>;
   fetchReports: () => Promise<void>;
@@ -166,7 +167,23 @@ export const useStore = create<DataState & DataActions>()(
         try {
           set({ loading: true, error: null });
           const commandes = await api.getOrders();
-          set({ commandes, loading: false });
+          const lignesCommande = (
+            await Promise.all(commandes.map((commande) => api.getOrderLines(commande.id)))
+          ).flat();
+          set({ commandes, lignesCommande, loading: false });
+        } catch (error: any) {
+          set({ error: error.message, loading: false });
+        }
+      },
+
+      fetchOrderLines: async () => {
+        try {
+          set({ loading: true, error: null });
+          const commandes = useStore.getState().commandes;
+          const lignesCommande = (
+            await Promise.all(commandes.map((commande) => api.getOrderLines(commande.id)))
+          ).flat();
+          set({ lignesCommande, loading: false });
         } catch (error: any) {
           set({ error: error.message, loading: false });
         }
@@ -422,7 +439,12 @@ export const useStore = create<DataState & DataActions>()(
         try {
           set({ loading: true, error: null });
           const newCommande = await api.createOrder(commande);
-          set((state) => ({ commandes: [...state.commandes, newCommande], loading: false }));
+          const lignesCommande = await api.getOrderLines(newCommande.id);
+          set((state) => ({
+            commandes: [...state.commandes, newCommande],
+            lignesCommande: [...state.lignesCommande, ...lignesCommande],
+            loading: false,
+          }));
         } catch (error: any) {
           set({ error: error.message, loading: false });
           throw error;
@@ -447,7 +469,11 @@ export const useStore = create<DataState & DataActions>()(
         try {
           set({ loading: true, error: null });
           await api.deleteOrder(id);
-          set((state) => ({ commandes: state.commandes.filter((c) => c.id !== id), loading: false }));
+          set((state) => ({
+            commandes: state.commandes.filter((c) => c.id !== id),
+            lignesCommande: state.lignesCommande.filter((ligne) => ligne.commandeId !== id),
+            loading: false,
+          }));
         } catch (error: any) {
           set({ error: error.message, loading: false });
           throw error;

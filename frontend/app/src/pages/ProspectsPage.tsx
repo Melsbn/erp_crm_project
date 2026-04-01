@@ -32,6 +32,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Edit2, Trash2, UserPlus, ArrowRight, Star, Phone, Mail, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const statutColors: Record<ProspectStatut, string> = {
   [ProspectStatut.NOUVEAU]: 'bg-blue-100 text-blue-700',
@@ -41,6 +42,7 @@ const statutColors: Record<ProspectStatut, string> = {
 };
 
 export function ProspectsPage() {
+  const { t } = useTranslation();
   const { prospects, addProspect, updateProspect, deleteProspect, convertProspectToClient } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -75,9 +77,9 @@ export function ProspectsPage() {
       await addProspect(formData);
       setIsAddDialogOpen(false);
       resetForm();
-      toast.success('Prospect créé avec succès');
+      toast.success(t('pages.prospects.createSuccess'));
     } catch {
-      toast.error('Échec de création du prospect');
+      toast.error(t('pages.prospects.createError'));
     }
   };
 
@@ -87,20 +89,20 @@ export function ProspectsPage() {
         await updateProspect(selectedProspect.id, formData);
         setIsEditDialogOpen(false);
         setSelectedProspect(null);
-        toast.success('Prospect mis à jour avec succès');
+        toast.success(t('pages.prospects.updateSuccess'));
       } catch {
-        toast.error('Échec de mise à jour du prospect');
+        toast.error(t('pages.prospects.updateError'));
       }
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce prospect ?')) {
+    if (confirm(t('pages.prospects.deleteConfirm'))) {
       try {
         await deleteProspect(id);
-        toast.success('Prospect supprimé avec succès');
+        toast.success(t('pages.prospects.deleteSuccess'));
       } catch {
-        toast.error('Échec de suppression du prospect');
+        toast.error(t('pages.prospects.deleteError'));
       }
     }
   };
@@ -111,9 +113,9 @@ export function ProspectsPage() {
         await convertProspectToClient(selectedProspect.id, convertData);
         setIsConvertDialogOpen(false);
         setSelectedProspect(null);
-        toast.success('Prospect converti en client avec succès');
+        toast.success(t('pages.prospects.convertSuccess'));
       } catch {
-        toast.error('Échec de conversion du prospect');
+        toast.error(t('pages.prospects.convertError'));
       }
     }
   };
@@ -163,27 +165,25 @@ export function ProspectsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Gestion des prospects</h1>
-          <p className="text-slate-500">Suivez et convertissez vos prospects</p>
+          <h1 className="text-2xl font-bold text-slate-800">{t('pages.prospects.title')}</h1>
+          <p className="text-slate-500">{t('pages.prospects.subtitle')}</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
               <Plus className="w-4 h-4 mr-2" />
-              Nouveau prospect
+              {t('pages.prospects.new')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Créer un prospect</DialogTitle>
-              <DialogDescription>
-                Remplissez les informations pour créer un nouveau prospect
-              </DialogDescription>
+              <DialogTitle>{t('pages.prospects.createTitle')}</DialogTitle>
+              <DialogDescription>{t('pages.prospects.createDescription')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="prenom">Prénom</Label>
+                  <Label htmlFor="prenom">{t('common.firstName')}</Label>
                   <Input
                     id="prenom"
                     value={formData.prenom}
@@ -191,7 +191,7 @@ export function ProspectsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nom">Nom</Label>
+                  <Label htmlFor="nom">{t('common.name')}</Label>
                   <Input
                     id="nom"
                     value={formData.nom}
@@ -200,7 +200,7 @@ export function ProspectsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('common.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -209,7 +209,7 @@ export function ProspectsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="telephone">Téléphone</Label>
+                <Label htmlFor="telephone">{t('common.phone')}</Label>
                 <Input
                   id="telephone"
                   value={formData.telephone}
@@ -217,7 +217,7 @@ export function ProspectsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="entreprise">Entreprise</Label>
+                <Label htmlFor="entreprise">{t('common.company')}</Label>
                 <Input
                   id="entreprise"
                   value={formData.entreprise}
@@ -225,7 +225,7 @@ export function ProspectsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="statut">Statut</Label>
+                <Label htmlFor="statut">{t('common.status')}</Label>
                 <Select
                   value={formData.statut}
                   onValueChange={(value) => setFormData({ ...formData, statut: value as ProspectStatut })}
@@ -234,20 +234,20 @@ export function ProspectsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="NOUVEAU">Nouveau</SelectItem>
-                    <SelectItem value="CONTACTE">Contacté</SelectItem>
-                    <SelectItem value="QUALIFIE">Qualifié</SelectItem>
-                    <SelectItem value="PERDU">Perdu</SelectItem>
+                    <SelectItem value="NOUVEAU">{t('statusLabels.prospect.NOUVEAU')}</SelectItem>
+                    <SelectItem value="CONTACTE">{t('statusLabels.prospect.CONTACTE')}</SelectItem>
+                    <SelectItem value="QUALIFIE">{t('statusLabels.prospect.QUALIFIE')}</SelectItem>
+                    <SelectItem value="PERDU">{t('statusLabels.prospect.PERDU')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700">
-                Créer
+                {t('common.create')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -263,7 +263,7 @@ export function ProspectsPage() {
                 <UserPlus className="w-5 h-5 text-slate-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Total</p>
+                <p className="text-sm text-slate-500">{t('common.total')}</p>
                 <p className="text-xl font-bold">{stats.total}</p>
               </div>
             </div>
@@ -276,7 +276,7 @@ export function ProspectsPage() {
                 <Star className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Nouveaux</p>
+                <p className="text-sm text-slate-500">{t('pages.prospects.statsNew')}</p>
                 <p className="text-xl font-bold">{stats.nouveau}</p>
               </div>
             </div>
@@ -289,7 +289,7 @@ export function ProspectsPage() {
                 <Phone className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Contactés</p>
+                <p className="text-sm text-slate-500">{t('pages.prospects.statsContacted')}</p>
                 <p className="text-xl font-bold">{stats.contacte}</p>
               </div>
             </div>
@@ -302,7 +302,7 @@ export function ProspectsPage() {
                 <UserCheck className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Qualifiés</p>
+                <p className="text-sm text-slate-500">{t('pages.prospects.statsQualified')}</p>
                 <p className="text-xl font-bold">{stats.qualifie}</p>
               </div>
             </div>
@@ -315,7 +315,7 @@ export function ProspectsPage() {
                 <Mail className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Perdus</p>
+                <p className="text-sm text-slate-500">{t('pages.prospects.statsLost')}</p>
                 <p className="text-xl font-bold">{stats.perdu}</p>
               </div>
             </div>
@@ -329,7 +329,7 @@ export function ProspectsPage() {
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Rechercher un prospect..."
+                placeholder={t('pages.prospects.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -341,12 +341,12 @@ export function ProspectsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Téléphone</TableHead>
-                <TableHead>Entreprise</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t('common.name')}</TableHead>
+                <TableHead>{t('common.email')}</TableHead>
+                <TableHead>{t('common.phone')}</TableHead>
+                <TableHead>{t('common.company')}</TableHead>
+                <TableHead>{t('common.status')}</TableHead>
+                <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -360,7 +360,7 @@ export function ProspectsPage() {
                   <TableCell>{prospect.entreprise || '-'}</TableCell>
                   <TableCell>
                     <Badge className={statutColors[prospect.statut]}>
-                      {prospect.statut}
+                      {t(`statusLabels.prospect.${prospect.statut}`)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -373,7 +373,7 @@ export function ProspectsPage() {
                           onClick={() => openConvertDialog(prospect)}
                         >
                           <ArrowRight className="w-4 h-4 mr-1" />
-                          Convertir
+                          {t('common.convert')}
                         </Button>
                       )}
                       <Button
@@ -404,15 +404,13 @@ export function ProspectsPage() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Modifier le prospect</DialogTitle>
-            <DialogDescription>
-              Modifiez les informations du prospect
-            </DialogDescription>
+            <DialogTitle>{t('pages.prospects.editTitle')}</DialogTitle>
+            <DialogDescription>{t('pages.prospects.editDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-prenom">Prénom</Label>
+                <Label htmlFor="edit-prenom">{t('common.firstName')}</Label>
                 <Input
                   id="edit-prenom"
                   value={formData.prenom}
@@ -420,7 +418,7 @@ export function ProspectsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-nom">Nom</Label>
+                <Label htmlFor="edit-nom">{t('common.name')}</Label>
                 <Input
                   id="edit-nom"
                   value={formData.nom}
@@ -429,7 +427,7 @@ export function ProspectsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
+              <Label htmlFor="edit-email">{t('common.email')}</Label>
               <Input
                 id="edit-email"
                 type="email"
@@ -438,7 +436,7 @@ export function ProspectsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-telephone">Téléphone</Label>
+              <Label htmlFor="edit-telephone">{t('common.phone')}</Label>
               <Input
                 id="edit-telephone"
                 value={formData.telephone}
@@ -446,7 +444,7 @@ export function ProspectsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-statut">Statut</Label>
+              <Label htmlFor="edit-statut">{t('common.status')}</Label>
               <Select
                 value={formData.statut}
                 onValueChange={(value) => setFormData({ ...formData, statut: value as ProspectStatut })}
@@ -455,20 +453,20 @@ export function ProspectsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ProspectStatut.NOUVEAU}>Nouveau</SelectItem>
-                  <SelectItem value={ProspectStatut.CONTACTE}>Contacté</SelectItem>
-                  <SelectItem value={ProspectStatut.QUALIFIE}>Qualifié</SelectItem>
-                  <SelectItem value={ProspectStatut.PERDU}>Perdu</SelectItem>
+                  <SelectItem value={ProspectStatut.NOUVEAU}>{t('statusLabels.prospect.NOUVEAU')}</SelectItem>
+                  <SelectItem value={ProspectStatut.CONTACTE}>{t('statusLabels.prospect.CONTACTE')}</SelectItem>
+                  <SelectItem value={ProspectStatut.QUALIFIE}>{t('statusLabels.prospect.QUALIFIE')}</SelectItem>
+                  <SelectItem value={ProspectStatut.PERDU}>{t('statusLabels.prospect.PERDU')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleEdit} className="bg-blue-600 hover:bg-blue-700">
-              Enregistrer
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -478,18 +476,18 @@ export function ProspectsPage() {
       <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Convertir en client</DialogTitle>
+            <DialogTitle>{t('pages.prospects.convertTitle')}</DialogTitle>
             <DialogDescription>
               {selectedProspect && (
                 <>
-                  Convertir <strong>{selectedProspect.prenom} {selectedProspect.nom}</strong> en client
+                  {t('pages.prospects.convertDescription', { name: `${selectedProspect.prenom} ${selectedProspect.nom}` })}
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="convert-type">Type de client</Label>
+              <Label htmlFor="convert-type">{t('pages.prospects.clientType')}</Label>
               <Select
                 value={convertData.type}
                 onValueChange={(value) => setConvertData({ ...convertData, type: value as ClientType })}
@@ -498,28 +496,28 @@ export function ProspectsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ClientType.PARTICULIER}>Particulier</SelectItem>
-                  <SelectItem value={ClientType.ENTREPRISE}>Entreprise</SelectItem>
+                  <SelectItem value={ClientType.PARTICULIER}>{t('statusLabels.clientType.PARTICULIER')}</SelectItem>
+                  <SelectItem value={ClientType.ENTREPRISE}>{t('statusLabels.clientType.ENTREPRISE')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="convert-adresse">Adresse</Label>
+              <Label htmlFor="convert-adresse">{t('common.address')}</Label>
               <Input
                 id="convert-adresse"
                 value={convertData.adresse}
                 onChange={(e) => setConvertData({ ...convertData, adresse: e.target.value })}
-                placeholder="Adresse complète"
+                placeholder={t('pages.prospects.fullAddress')}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsConvertDialogOpen(false)}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleConvert} className="bg-green-600 hover:bg-green-700">
               <ArrowRight className="w-4 h-4 mr-2" />
-              Convertir
+              {t('common.convert')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -527,5 +525,4 @@ export function ProspectsPage() {
     </div>
   );
 }
-
 

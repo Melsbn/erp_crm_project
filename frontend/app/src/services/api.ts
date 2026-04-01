@@ -6,6 +6,7 @@ import type {
   Produit,
   Categorie,
   Commande,
+  LigneCommande,
   Facture,
   Paiement,
   Interaction,
@@ -203,6 +204,10 @@ class ApiService {
   // Orders
   async getOrders(): Promise<Commande[]> {
     return this.request<Commande[]>('/orders');
+  }
+
+  async getOrderLines(orderId: string): Promise<LigneCommande[]> {
+    return this.request<LigneCommande[]>(`/orders/${orderId}/lines`);
   }
 
   async createOrder(order: any): Promise<Commande> {

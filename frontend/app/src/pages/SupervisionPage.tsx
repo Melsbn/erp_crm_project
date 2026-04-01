@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store';
 import { UserRole, StatutCommande } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,11 +36,12 @@ import {
 } from 'lucide-react';
 
 export function SupervisionPage() {
+  const { t, i18n } = useTranslation();
   const { users, commandes, clients, interactions, factures } = useStore();
+  const locale = i18n.resolvedLanguage === 'en' ? 'en-US' : 'fr-FR';
 
   const employes = users.filter((u) => u.role === UserRole.EMPLOYE);
 
-  // Employee performance data
   const performanceData = useMemo(() => {
     return employes.map((emp) => {
       const empCommandes = commandes.filter((c) => c.userId === emp.id);
@@ -57,7 +59,6 @@ export function SupervisionPage() {
     });
   }, [employes, commandes, interactions]);
 
-  // Activity timeline
   const activityData = [
     { heure: '08:00', actions: 5 },
     { heure: '09:00', actions: 12 },
@@ -71,7 +72,6 @@ export function SupervisionPage() {
     { heure: '17:00', actions: 10 },
   ];
 
-  // Global stats
   const stats = {
     totalEmployes: employes.length,
     commandesAujourdhui: commandes.filter(
@@ -89,28 +89,24 @@ export function SupervisionPage() {
     ).length,
   };
 
-  // Top performers
-  const topPerformers = [...performanceData]
-    .sort((a, b) => b.ventes - a.ventes)
-    .slice(0, 3);
+  const topPerformers = [...performanceData].sort((a, b) => b.ventes - a.ventes).slice(0, 3);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Supervision et contrôle</h1>
-        <p className="text-slate-500">Suivez les performances et l'activité de votre équipe</p>
+        <h1 className="text-2xl font-bold text-slate-800">{t('pages.supervision.title')}</h1>
+        <p className="text-slate-500">{t('pages.supervision.subtitle')}</p>
       </div>
 
-      {/* Global Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-blue-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+                <Users className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Employés</p>
+                <p className="text-sm text-slate-500">{t('pages.supervision.employees')}</p>
                 <p className="text-xl font-bold">{stats.totalEmployes}</p>
               </div>
             </div>
@@ -119,11 +115,11 @@ export function SupervisionPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-green-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                <TrendingUp className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Commandes aujourd'hui</p>
+                <p className="text-sm text-slate-500">{t('pages.supervision.ordersToday')}</p>
                 <p className="text-xl font-bold">{stats.commandesAujourdhui}</p>
               </div>
             </div>
@@ -132,11 +128,11 @@ export function SupervisionPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="w-5 h-5 text-yellow-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-100">
+                <Clock className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">En cours</p>
+                <p className="text-sm text-slate-500">{t('pages.supervision.inProgress')}</p>
                 <p className="text-xl font-bold">{stats.commandesEnCours}</p>
               </div>
             </div>
@@ -145,11 +141,11 @@ export function SupervisionPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                <AlertCircle className="w-5 h-5 text-orange-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
+                <AlertCircle className="h-5 w-5 text-orange-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Factures attente</p>
+                <p className="text-sm text-slate-500">{t('pages.supervision.invoicesPending')}</p>
                 <p className="text-xl font-bold">{stats.facturesEnAttente}</p>
               </div>
             </div>
@@ -158,11 +154,11 @@ export function SupervisionPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Target className="w-5 h-5 text-purple-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
+                <Target className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Nouveaux clients</p>
+                <p className="text-sm text-slate-500">{t('pages.supervision.newClients')}</p>
                 <p className="text-xl font-bold">{stats.nouveauxClients}</p>
               </div>
             </div>
@@ -171,11 +167,11 @@ export function SupervisionPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
-                <Activity className="w-5 h-5 text-pink-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-pink-100">
+                <Activity className="h-5 w-5 text-pink-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Interactions</p>
+                <p className="text-sm text-slate-500">{t('pages.supervision.interactions')}</p>
                 <p className="text-xl font-bold">{stats.interactionsAujourdhui}</p>
               </div>
             </div>
@@ -186,24 +182,24 @@ export function SupervisionPage() {
       <Tabs defaultValue="performance" className="w-full">
         <TabsList>
           <TabsTrigger value="performance">
-            <Award className="w-4 h-4 mr-2" />
-            Performance
+            <Award className="mr-2 h-4 w-4" />
+            {t('common.performance')}
           </TabsTrigger>
           <TabsTrigger value="activite">
-            <Activity className="w-4 h-4 mr-2" />
-            Activité
+            <Activity className="mr-2 h-4 w-4" />
+            {t('pages.supervision.activity')}
           </TabsTrigger>
           <TabsTrigger value="classement">
-            <TrendingUp className="w-4 h-4 mr-2" />
-            Classement
+            <TrendingUp className="mr-2 h-4 w-4" />
+            {t('pages.supervision.ranking')}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="performance" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Ventes par employé</CardTitle>
+                <CardTitle>{t('pages.supervision.salesByEmployee')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -211,7 +207,7 @@ export function SupervisionPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis type="number" />
                     <YAxis dataKey="nom" type="category" width={120} />
-                    <Tooltip formatter={(value: number) => `${value.toLocaleString('fr-FR')} €`} />
+                    <Tooltip formatter={(value: number) => `${value.toLocaleString(locale)} €`} />
                     <Bar dataKey="ventes" fill="#3b82f6" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -220,7 +216,7 @@ export function SupervisionPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Commandes par employé</CardTitle>
+                <CardTitle>{t('pages.supervision.ordersByEmployee')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -238,17 +234,17 @@ export function SupervisionPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Détail des performances</CardTitle>
+              <CardTitle>{t('pages.supervision.performanceDetails')}</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Employé</TableHead>
-                    <TableHead className="text-right">Commandes</TableHead>
-                    <TableHead className="text-right">Ventes</TableHead>
-                    <TableHead className="text-right">Clients</TableHead>
-                    <TableHead className="text-right">Interactions</TableHead>
+                    <TableHead>{t('common.employee')}</TableHead>
+                    <TableHead className="text-right">{t('pages.reports.orderCountLabel')}</TableHead>
+                    <TableHead className="text-right">{t('pages.supervision.sales')}</TableHead>
+                    <TableHead className="text-right">{t('navigation.clients')}</TableHead>
+                    <TableHead className="text-right">{t('common.interactions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -256,9 +252,7 @@ export function SupervisionPage() {
                     <TableRow key={emp.id}>
                       <TableCell className="font-medium">{emp.nom}</TableCell>
                       <TableCell className="text-right">{emp.commandes}</TableCell>
-                      <TableCell className="text-right">
-                        {emp.ventes.toLocaleString('fr-FR')} €
-                      </TableCell>
+                      <TableCell className="text-right">{emp.ventes.toLocaleString(locale)} €</TableCell>
                       <TableCell className="text-right">{emp.clients}</TableCell>
                       <TableCell className="text-right">{emp.interactions}</TableCell>
                     </TableRow>
@@ -272,7 +266,7 @@ export function SupervisionPage() {
         <TabsContent value="activite" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Activité horaire</CardTitle>
+              <CardTitle>{t('pages.supervision.hourlyActivity')}</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -293,22 +287,22 @@ export function SupervisionPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <Card>
               <CardHeader>
-                <CardTitle>Heures de pointe</CardTitle>
+                <CardTitle>{t('pages.supervision.peakHours')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
                     <span className="font-medium">14:00 - 15:00</span>
                     <Badge>22 actions</Badge>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
                     <span className="font-medium">15:00 - 16:00</span>
                     <Badge>18 actions</Badge>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
                     <span className="font-medium">10:00 - 11:00</span>
                     <Badge>18 actions</Badge>
                   </div>
@@ -318,24 +312,24 @@ export function SupervisionPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Activité par type</CardTitle>
+                <CardTitle>{t('pages.supervision.activityByType')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <span className="font-medium">Commandes</span>
+                  <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                    <span className="font-medium">{t('navigation.orders')}</span>
                     <Badge className="bg-blue-100 text-blue-700">
                       {commandes.filter((c) => new Date(c.dateCommande).toDateString() === new Date().toDateString()).length}
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <span className="font-medium">Interactions</span>
+                  <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                    <span className="font-medium">{t('common.interactions')}</span>
                     <Badge className="bg-green-100 text-green-700">
                       {interactions.filter((i) => new Date(i.date).toDateString() === new Date().toDateString()).length}
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <span className="font-medium">Nouveaux clients</span>
+                  <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                    <span className="font-medium">{t('pages.supervision.newClients')}</span>
                     <Badge className="bg-purple-100 text-purple-700">
                       {clients.filter((c) => new Date(c.dateCreation).toDateString() === new Date().toDateString()).length}
                     </Badge>
@@ -346,30 +340,30 @@ export function SupervisionPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Alertes</CardTitle>
+                <CardTitle>{t('pages.supervision.alerts')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {stats.facturesEnAttente > 0 && (
-                    <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg">
-                      <AlertCircle className="w-5 h-5 text-yellow-600" />
+                    <div className="flex items-center gap-3 rounded-lg bg-yellow-50 p-3">
+                      <AlertCircle className="h-5 w-5 text-yellow-600" />
                       <span className="text-sm">
-                        {stats.facturesEnAttente} factures en attente de paiement
+                        {stats.facturesEnAttente} {t('pages.supervision.awaitingPayment')}
                       </span>
                     </div>
                   )}
                   {stats.commandesEnCours > 0 && (
-                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                      <Clock className="w-5 h-5 text-blue-600" />
+                    <div className="flex items-center gap-3 rounded-lg bg-blue-50 p-3">
+                      <Clock className="h-5 w-5 text-blue-600" />
                       <span className="text-sm">
-                        {stats.commandesEnCours} commandes en cours de traitement
+                        {stats.commandesEnCours} {t('pages.supervision.beingProcessed')}
                       </span>
                     </div>
                   )}
-                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <div className="flex items-center gap-3 rounded-lg bg-green-50 p-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
                     <span className="text-sm">
-                      {stats.commandesAujourdhui} commandes validées aujourd'hui
+                      {stats.commandesAujourdhui} {t('pages.supervision.validatedToday')}
                     </span>
                   </div>
                 </div>
@@ -379,27 +373,19 @@ export function SupervisionPage() {
         </TabsContent>
 
         <TabsContent value="classement" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {topPerformers.map((performer, index) => (
-              <Card key={performer.id} className={index === 0 ? 'border-yellow-400 border-2' : ''}>
+              <Card key={performer.id} className={index === 0 ? 'border-2 border-yellow-400' : ''}>
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-center mb-4">
+                  <div className="mb-4 flex items-center justify-center">
                     <div
-                      className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                        index === 0
-                          ? 'bg-yellow-100'
-                          : index === 1
-                          ? 'bg-slate-100'
-                          : 'bg-orange-100'
+                      className={`flex h-16 w-16 items-center justify-center rounded-full ${
+                        index === 0 ? 'bg-yellow-100' : index === 1 ? 'bg-slate-100' : 'bg-orange-100'
                       }`}
                     >
                       <Award
-                        className={`w-8 h-8 ${
-                          index === 0
-                            ? 'text-yellow-600'
-                            : index === 1
-                            ? 'text-slate-600'
-                            : 'text-orange-600'
+                        className={`h-8 w-8 ${
+                          index === 0 ? 'text-yellow-600' : index === 1 ? 'text-slate-600' : 'text-orange-600'
                         }`}
                       />
                     </div>
@@ -410,17 +396,15 @@ export function SupervisionPage() {
                   </div>
                   <div className="mt-4 space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Ventes:</span>
-                      <span className="font-medium">
-                        {performer.ventes.toLocaleString('fr-FR')} €
-                      </span>
+                      <span className="text-slate-500">{t('pages.supervision.sales')}:</span>
+                      <span className="font-medium">{performer.ventes.toLocaleString(locale)} €</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Commandes:</span>
+                      <span className="text-slate-500">{t('navigation.orders')}:</span>
                       <span className="font-medium">{performer.commandes}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Clients:</span>
+                      <span className="text-slate-500">{t('navigation.clients')}:</span>
                       <span className="font-medium">{performer.clients}</span>
                     </div>
                   </div>
@@ -431,17 +415,17 @@ export function SupervisionPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Classement complet</CardTitle>
+              <CardTitle>{t('pages.supervision.completeRanking')}</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Rang</TableHead>
-                    <TableHead>Employé</TableHead>
-                    <TableHead className="text-right">Ventes</TableHead>
-                    <TableHead className="text-right">Commandes</TableHead>
-                    <TableHead className="text-right">Panier moyen</TableHead>
+                    <TableHead>{t('common.rank')}</TableHead>
+                    <TableHead>{t('common.employee')}</TableHead>
+                    <TableHead className="text-right">{t('pages.supervision.sales')}</TableHead>
+                    <TableHead className="text-right">{t('navigation.orders')}</TableHead>
+                    <TableHead className="text-right">{t('pages.supervision.avgBasket')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -451,24 +435,20 @@ export function SupervisionPage() {
                       <TableRow key={emp.id}>
                         <TableCell>
                           {index === 0 ? (
-                            <Badge className="bg-yellow-100 text-yellow-700">1er</Badge>
+                            <Badge className="bg-yellow-100 text-yellow-700">{t('pages.supervision.first')}</Badge>
                           ) : index === 1 ? (
-                            <Badge className="bg-slate-100 text-slate-700">2ème</Badge>
+                            <Badge className="bg-slate-100 text-slate-700">{t('pages.supervision.second')}</Badge>
                           ) : index === 2 ? (
-                            <Badge className="bg-orange-100 text-orange-700">3ème</Badge>
+                            <Badge className="bg-orange-100 text-orange-700">{t('pages.supervision.third')}</Badge>
                           ) : (
-                            <span className="text-slate-500">{index + 1}ème</span>
+                            <span className="text-slate-500">{index + 1}</span>
                           )}
                         </TableCell>
                         <TableCell className="font-medium">{emp.nom}</TableCell>
-                        <TableCell className="text-right">
-                          {emp.ventes.toLocaleString('fr-FR')} €
-                        </TableCell>
+                        <TableCell className="text-right">{emp.ventes.toLocaleString(locale)} €</TableCell>
                         <TableCell className="text-right">{emp.commandes}</TableCell>
                         <TableCell className="text-right">
-                          {emp.commandes > 0
-                            ? Math.round(emp.ventes / emp.commandes).toLocaleString('fr-FR')
-                            : 0} €
+                          {emp.commandes > 0 ? Math.round(emp.ventes / emp.commandes).toLocaleString(locale) : 0} €
                         </TableCell>
                       </TableRow>
                     ))}
