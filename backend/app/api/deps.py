@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.security import decode_token
+from app.core.database import get_database
 from typing import Optional, List
 
 security = HTTPBearer()
@@ -8,13 +9,32 @@ security = HTTPBearer()
 ROLE_ADMIN = "ADMIN"
 ROLE_SUPERVISEUR = "SUPERVISEUR"
 ROLE_EMPLOYE = "EMPLOYE"
+SUPERVISOR_EMAIL = "supervisor@gmail.com"
+PRIMARY_SUPERVISOR_FIELD = "is_primary_supervisor"
 
 ALLOWED_ROLES = [ROLE_ADMIN, ROLE_SUPERVISEUR, ROLE_EMPLOYE]
+
+
+def is_user_active(user: dict) -> bool:
+    if "actif" in user:
+        return bool(user["actif"])
+    return bool(user.get("is_active", True))
+
+
+def is_primary_supervisor(user: Optional[dict]) -> bool:
+    return bool(user and user.get(PRIMARY_SUPERVISOR_FIELD))
+
+
+def can_use_supervisor_role(user: dict) -> bool:
+    if user.get("role") != ROLE_SUPERVISEUR:
+        return True
+    return is_primary_supervisor(user)
 
 # ---------------- GET CURRENT USER ----------------
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
+    db=Depends(get_database),
 ) -> dict:
 
     credentials_exception = HTTPException(
@@ -30,6 +50,22 @@ async def get_current_user(
 
     if payload.get("role") not in ALLOWED_ROLES:
         raise credentials_exception
+
+    user = await db.users.find_one({"email": payload.get("sub")})
+    if not user:
+        raise credentials_exception
+
+    if not can_use_supervisor_role(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the primary supervisor account can use the supervisor role",
+        )
+
+    if not is_user_active(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated",
+        )
 
     return payload
 

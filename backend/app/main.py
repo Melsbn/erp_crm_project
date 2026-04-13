@@ -2,8 +2,62 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.core.database import connect_to_mongo, close_mongo_connection
+from app.core.database import connect_to_mongo, close_mongo_connection, get_database
 from app.api import auth, users, clients, prospects, products, orders, invoices, misc, dashboard, assistant
+from app.api.deps import (
+    ROLE_EMPLOYE,
+    ROLE_SUPERVISEUR,
+    PRIMARY_SUPERVISOR_FIELD,
+    SUPERVISOR_EMAIL,
+)
+
+
+async def enforce_primary_supervisor_identity() -> None:
+    """Promote the legacy supervisor account to primary and demote any other supervisors."""
+    db = get_database()
+    primary_supervisor = await db.users.find_one(
+        {PRIMARY_SUPERVISOR_FIELD: True, "role": ROLE_SUPERVISEUR}
+    )
+
+    if not primary_supervisor:
+        primary_supervisor = await db.users.find_one(
+            {"role": ROLE_SUPERVISEUR, "email": SUPERVISOR_EMAIL}
+        )
+        if primary_supervisor:
+            await db.users.update_one(
+                {"_id": primary_supervisor["_id"]},
+                {"$set": {PRIMARY_SUPERVISOR_FIELD: True}},
+            )
+
+    if not primary_supervisor:
+        await db.users.update_many(
+            {PRIMARY_SUPERVISOR_FIELD: True},
+            {"$unset": {PRIMARY_SUPERVISOR_FIELD: ""}},
+        )
+        return
+
+    await db.users.update_many(
+        {
+            PRIMARY_SUPERVISOR_FIELD: True,
+            "_id": {"$ne": primary_supervisor["_id"]},
+        },
+        {"$unset": {PRIMARY_SUPERVISOR_FIELD: ""}},
+    )
+
+    result = await db.users.update_many(
+        {
+            "role": ROLE_SUPERVISEUR,
+            "_id": {"$ne": primary_supervisor["_id"]},
+        },
+        {
+            "$set": {"role": ROLE_EMPLOYE},
+            "$unset": {PRIMARY_SUPERVISOR_FIELD: ""},
+        },
+    )
+    if result.modified_count:
+        print(
+            f"Demoted {result.modified_count} non-primary supervisor account(s) to EMPLOYE"
+        )
 
 
 @asynccontextmanager
@@ -11,6 +65,7 @@ async def lifespan(app: FastAPI):
     """Handle startup and shutdown events."""
     # Startup
     await connect_to_mongo()
+    await enforce_primary_supervisor_identity()
     yield
     # Shutdown
     await close_mongo_connection()

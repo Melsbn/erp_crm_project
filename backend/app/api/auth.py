@@ -13,6 +13,7 @@ from app.core.security import (
 from app.core.database import get_database
 from app.core.email_service import send_reset_code_email
 from app.core.config import settings
+from app.api.deps import can_use_supervisor_role, is_user_active
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +75,16 @@ async def login(credentials: Login, db=Depends(get_database)):
             detail="Invalid email or password"
         )
 
-    if not user.get("is_active", True):
+    if not is_user_active(user):
         raise HTTPException(
             status_code=403,
             detail="Account is deactivated"
+        )
+
+    if not can_use_supervisor_role(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the primary supervisor account can use the supervisor role"
         )
 
     access_token = create_access_token(
@@ -221,6 +228,7 @@ async def reset_password(request: PasswordResetConfirm, db=Depends(get_database)
 @router.get("/me")
 async def get_current_user_info(
     credentials: HTTPAuthorizationCredentials = Depends(security),
+    db=Depends(get_database),
 ):
 
     payload = decode_token(credentials.credentials)
@@ -235,6 +243,25 @@ async def get_current_user_info(
         raise HTTPException(
             status_code=403,
             detail="Insufficient privileges",
+        )
+
+    user = await db.users.find_one({"email": payload["sub"]})
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication credentials",
+        )
+
+    if not is_user_active(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Account is deactivated",
+        )
+
+    if not can_use_supervisor_role(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the primary supervisor account can use the supervisor role",
         )
 
     return {

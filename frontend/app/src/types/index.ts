@@ -75,6 +75,7 @@ export interface User extends BaseEntity {
   passwordHash: string;
   actif: boolean;
   role: UserRole;
+  is_primary_supervisor?: boolean;
 }
 
 export interface Role {

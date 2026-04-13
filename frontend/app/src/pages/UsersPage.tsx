@@ -53,17 +53,31 @@ export function UsersPage() {
     actif: true,
   });
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users
+    .filter(
+      (user) =>
+        user.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aIsPrimarySupervisor = Boolean(a.is_primary_supervisor);
+      const bIsPrimarySupervisor = Boolean(b.is_primary_supervisor);
+
+      if (aIsPrimarySupervisor && !bIsPrimarySupervisor) return -1;
+      if (!aIsPrimarySupervisor && bIsPrimarySupervisor) return 1;
+
+      return `${a.prenom} ${a.nom}`.localeCompare(`${b.prenom} ${b.nom}`, 'fr', {
+        sensitivity: 'base',
+      });
+    });
 
   const assignableRoles: UserRole[] =
     currentUser?.role === UserRole.SUPERVISEUR
-      ? [UserRole.ADMIN, UserRole.SUPERVISEUR, UserRole.EMPLOYE]
+      ? [UserRole.ADMIN, UserRole.EMPLOYE]
       : [UserRole.EMPLOYE];
+
+  const isPrimarySupervisor = Boolean(selectedUser?.is_primary_supervisor);
 
   const handleAdd = async () => {
     try {
@@ -86,14 +100,20 @@ export function UsersPage() {
   const handleEdit = async () => {
     if (!selectedUser) return;
 
-    const updatePayload = {
-      nom: formData.nom,
-      prenom: formData.prenom,
-      email: formData.email,
-      role: formData.role,
-      actif: formData.actif,
-      ...(formData.password ? { password: formData.password } : {}),
-    };
+    const updatePayload = isPrimarySupervisor
+      ? {
+          nom: formData.nom,
+          prenom: formData.prenom,
+          email: formData.email,
+        }
+      : {
+          nom: formData.nom,
+          prenom: formData.prenom,
+          email: formData.email,
+          role: formData.role,
+          actif: formData.actif,
+          ...(formData.password ? { password: formData.password } : {}),
+        };
 
     try {
       await updateUser(String(selectedUser.id), updatePayload);
@@ -290,14 +310,16 @@ export function UsersPage() {
                       <Button variant="ghost" size="icon" onClick={() => openEditDialog(user)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(user.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!user.is_primary_supervisor && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(user.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -341,41 +363,42 @@ export function UsersPage() {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-role">{t('common.role')}</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {assignableRoles.includes(UserRole.ADMIN) && (
-                    <SelectItem value="ADMIN">{t('statusLabels.role.ADMIN')}</SelectItem>
-                  )}
-                  {assignableRoles.includes(UserRole.SUPERVISEUR) && (
-                    <SelectItem value="SUPERVISEUR">{t('statusLabels.role.SUPERVISEUR')}</SelectItem>
-                  )}
-                  <SelectItem value="EMPLOYE">{t('statusLabels.role.EMPLOYE')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-actif">{t('common.status')}</Label>
-              <Select
-                value={formData.actif ? 'actif' : 'inactif'}
-                onValueChange={(value) => setFormData({ ...formData, actif: value === 'actif' })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="actif">{t('common.active')}</SelectItem>
-                  <SelectItem value="inactif">{t('common.inactive')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {!isPrimarySupervisor && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-role">{t('common.role')}</Label>
+                  <Select
+                    value={formData.role}
+                    onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assignableRoles.includes(UserRole.ADMIN) && (
+                        <SelectItem value="ADMIN">{t('statusLabels.role.ADMIN')}</SelectItem>
+                      )}
+                      <SelectItem value="EMPLOYE">{t('statusLabels.role.EMPLOYE')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-actif">{t('common.status')}</Label>
+                  <Select
+                    value={formData.actif ? 'actif' : 'inactif'}
+                    onValueChange={(value) => setFormData({ ...formData, actif: value === 'actif' })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="actif">{t('common.active')}</SelectItem>
+                      <SelectItem value="inactif">{t('common.inactive')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>

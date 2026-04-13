@@ -9,12 +9,38 @@ from app.api.deps import (
     ROLE_ADMIN,
     ROLE_SUPERVISEUR,
     ROLE_EMPLOYE,
+    PRIMARY_SUPERVISOR_FIELD,
     is_admin,
+    is_primary_supervisor,
     ensure_supervisor_can_manage_privileged_roles,
 )
 from app.core.security import get_password_hash
 
 router = APIRouter()
+
+
+def normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+async def ensure_valid_supervisor_assignment(
+    db,
+    role: str,
+    current_user_id: str | None = None,
+):
+    if role != ROLE_SUPERVISEUR:
+        return
+
+    query = {PRIMARY_SUPERVISOR_FIELD: True}
+    if current_user_id and ObjectId.is_valid(current_user_id):
+        query["_id"] = {"$ne": ObjectId(current_user_id)}
+
+    existing_primary = await db[UserModel.collection].find_one(query)
+    if existing_primary:
+        raise HTTPException(
+            status_code=400,
+            detail="The primary supervisor account already exists",
+        )
 
 
 # ---------------- GET ALL USERS ----------------
@@ -60,11 +86,17 @@ async def create_user(
 ):
     ensure_supervisor_can_manage_privileged_roles(user.role.value, current_user)
 
-    existing_user = await db[UserModel.collection].find_one({"email": user.email})
+    normalized_email = normalize_email(user.email)
+    await ensure_valid_supervisor_assignment(db, user.role.value)
+
+    existing_user = await db[UserModel.collection].find_one({"email": normalized_email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user_dict = user.model_dump(exclude={"password"})
+    user_dict["email"] = normalized_email
+    if user.role.value == ROLE_SUPERVISEUR:
+        user_dict[PRIMARY_SUPERVISOR_FIELD] = True
 
     # HASH PASSWORD
     user_dict["hashed_password"] = get_password_hash(user.password)
@@ -96,17 +128,34 @@ async def update_user(
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    existing_target = await db[UserModel.collection].find_one({"_id": ObjectId(user_id)})
+    if not existing_target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if is_primary_supervisor(existing_target):
+        allowed_fields = {"nom", "prenom", "email"}
+        disallowed_fields = set(update_data.keys()) - allowed_fields
+        if disallowed_fields:
+            raise HTTPException(
+                status_code=400,
+                detail="The primary supervisor can only update first name, last name, and email",
+            )
+
+    target_role = update_data.get("role", existing_target.get("role"))
+    target_role_value = target_role.value if hasattr(target_role, "value") else target_role
+
     if "email" in update_data:
+        target_email = normalize_email(update_data["email"])
+        update_data["email"] = target_email
         existing_user = await db[UserModel.collection].find_one({
-            "email": update_data["email"],
+            "email": target_email,
             "_id": {"$ne": ObjectId(user_id)}
         })
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already in use")
 
-    existing_target = await db[UserModel.collection].find_one({"_id": ObjectId(user_id)})
-    if not existing_target:
-        raise HTTPException(status_code=404, detail="User not found")
+    if "email" not in update_data:
+        target_email = normalize_email(existing_target["email"])
 
     ensure_supervisor_can_manage_privileged_roles(existing_target.get("role"), current_user)
     if "role" in update_data:
@@ -115,6 +164,17 @@ async def update_user(
             new_role.value if hasattr(new_role, "value") else new_role,
             current_user
         )
+
+    await ensure_valid_supervisor_assignment(
+        db,
+        target_role_value,
+        current_user_id=user_id,
+    )
+
+    if target_role_value == ROLE_SUPERVISEUR:
+        update_data[PRIMARY_SUPERVISOR_FIELD] = True
+    elif PRIMARY_SUPERVISOR_FIELD in update_data:
+        update_data.pop(PRIMARY_SUPERVISOR_FIELD)
 
     result = await db[UserModel.collection].update_one(
         {"_id": ObjectId(user_id)},
@@ -141,6 +201,12 @@ async def delete_user(
     target_user = await db[UserModel.collection].find_one({"_id": ObjectId(user_id)})
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if is_primary_supervisor(target_user):
+        raise HTTPException(
+            status_code=400,
+            detail="The primary supervisor account cannot be deleted",
+        )
 
     ensure_supervisor_can_manage_privileged_roles(target_user.get("role"), current_user)
 
