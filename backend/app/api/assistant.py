@@ -323,28 +323,72 @@ async def sales_forecast(
     current_user: dict = Depends(require_roles([ROLE_ADMIN, ROLE_SUPERVISEUR, ROLE_EMPLOYE])),
 ):
     question = (payload.get("question") or "").strip()
-    history  = payload.get("history") or []
+    history = payload.get("history") or []
+    language = "en" if str(payload.get("language") or "").lower().startswith("en") else "fr"
 
     if not question:
         raise HTTPException(status_code=400, detail="Question is required")
 
-    # ── 1. Instant replies ─────────────────────────────────────────
-    q_lower = question.lower().strip()
-    if q_lower in INSTANT_REPLIES:
-        return {"answer": INSTANT_REPLIES[q_lower], "chart": None, "predictions": [], "top_products": [], "top_clients": []}
+    instant_replies = {
+        "fr": {
+            "merci": "De rien ! N'hesitez pas si vous avez d'autres questions.",
+            "super": "Ravi de pouvoir vous aider !",
+            "ok": "D'accord ! Autre chose ?",
+            "bien": "Tant mieux ! Je suis la si vous avez d'autres questions.",
+            "parfait": "Parfait ! N'hesitez pas si vous avez d'autres questions.",
+            "au revoir": "Au revoir ! Bonne journee.",
+            "bonne journee": "Merci, bonne journee a vous aussi !",
+            "bonjour": "Bonjour ! Comment puis-je vous aider ?",
+            "bonsoir": "Bonsoir ! Comment puis-je vous aider ?",
+            "salut": "Salut ! Comment puis-je vous aider ?",
+            "stp": "Bien sur, je vous ecoute.",
+            "svp": "Bien sur, je vous ecoute.",
+        },
+        "en": {
+            "thanks": "You're welcome! Let me know if you need anything else.",
+            "thank you": "You're welcome! Let me know if you need anything else.",
+            "great": "Glad I could help!",
+            "ok": "Alright! Anything else?",
+            "perfect": "Perfect! Let me know if you need anything else.",
+            "goodbye": "Goodbye! Have a great day.",
+            "bye": "Goodbye! Have a great day.",
+            "hello": "Hello! How can I help you?",
+            "hi": "Hi! How can I help you?",
+            "please": "Of course, I'm listening.",
+        },
+    }
 
     system_prompt = (
-        "Tu es un assistant IA intégré dans un CRM/ERP professionnel. "
-        "Tu réponds uniquement en français, de manière concise et naturelle. "
-        "Tu utilises les données fournies pour répondre précisément aux questions. "
-        "Tu n'inventes jamais de données. "
+        "You are an AI assistant integrated into a professional CRM/ERP. "
+        "You answer only in English, concisely and naturally. "
+        "You use the provided data to answer questions precisely. "
+        "You never invent data. "
+        "You never show technical identifiers such as ObjectId or _id. "
+        "When listing clients, include their full name, email, phone number, and total spent when available. "
+        "When listing invoices, clearly state the payment status. "
+        "If the data is insufficient, say so clearly."
+        if language == "en"
+        else
+        "Tu es un assistant IA integre dans un CRM/ERP professionnel. "
+        "Tu reponds uniquement en francais, de maniere concise et naturelle. "
+        "Tu utilises les donnees fournies pour repondre precisement aux questions. "
+        "Tu n'inventes jamais de donnees. "
         "Tu ne montres jamais d'identifiants techniques (ObjectId, _id). "
-        "Quand tu listes des clients, tu inclus leur nom complet, email, téléphone et montant dépensé si disponibles. "
+        "Quand tu listes des clients, tu inclus leur nom complet, email, telephone et montant depense si disponibles. "
         "Quand tu listes des factures, tu indiques le statut de paiement clairement. "
-        "Si les données ne permettent pas de répondre, dis-le clairement."
+        "Si les donnees ne permettent pas de repondre, dis-le clairement."
     )
 
-    # ── 2. Intent detection ────────────────────────────────────────
+    q_lower = question.lower().strip()
+    if q_lower in instant_replies[language]:
+        return {
+            "answer": instant_replies[language][q_lower],
+            "chart": None,
+            "predictions": [],
+            "top_products": [],
+            "top_clients": [],
+        }
+
     history_text = " ".join(
         m.get("content", "")[:200]
         for m in _strip_charts(history[-6:])
@@ -356,18 +400,21 @@ async def sales_forecast(
         intent["interactions"], intent["employees"],
     ])
 
-    # ── 3. General question ────────────────────────────────────────
     if is_general:
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": question},
+            {"role": "user", "content": question},
         ]
         answer = await _groq_call(messages)
         if not answer:
-            answer = "Je suis là pour vous aider. Posez-moi une question sur vos ventes, clients, factures, produits, prospects ou interactions."
+            answer = (
+                "I'm here to help. Ask me a question about your sales, clients, invoices, products, prospects, or interactions."
+                if language == "en"
+                else
+                "Je suis la pour vous aider. Posez-moi une question sur vos ventes, clients, factures, produits, prospects ou interactions."
+            )
         return {"answer": answer, "chart": None, "predictions": [], "top_products": [], "top_clients": []}
 
-    # ── 4. DB queries — only what's needed ────────────────────────
     tasks = {}
     if intent["sales"]:
         tasks["sales"] = db[CommandeModel.collection].aggregate(_pipeline_sales()).to_list(MAX_DOCS)
@@ -388,7 +435,6 @@ async def sales_forecast(
 
     results = dict(zip(tasks.keys(), await asyncio.gather(*tasks.values())))
 
-    # ── 5. Process results ─────────────────────────────────────────
     data_parts = []
     predictions_preview = []
     top_prod = []
@@ -398,116 +444,125 @@ async def sales_forecast(
         df_sales = pd.DataFrame([{"month": d["_id"], "total": d["total"]} for d in results["sales"]])
         forecast_df = forecast_sales(df_sales)
         predictions_preview = safe_records(forecast_df)
-        data_parts.append(f"Prévisions de ventes: {predictions_preview}")
+        data_parts.append(f'{"Sales forecast" if language == "en" else "Previsions de ventes"}: {predictions_preview}')
 
     if results.get("products"):
         top_prod = [
             {
-                "nom":               d.get("nom", "Inconnu"),
-                "description":       d.get("description", ""),
-                "prix":              d.get("prix", 0),
-                "stock":             d.get("stock", 0),
-                "disponible":        d.get("disponible", False),
+                "nom": d.get("nom", "Unknown" if language == "en" else "Inconnu"),
+                "description": d.get("description", ""),
+                "prix": d.get("prix", 0),
+                "stock": d.get("stock", 0),
+                "disponible": d.get("disponible", False),
                 "predicted_revenue": round(d.get("predicted_revenue", 0), 2),
             }
             for d in results["products"]
         ]
-        data_parts.append(f"Produits (nom, prix, stock, disponible, revenu): {top_prod}")
+        data_parts.append(f'{"Products (name, price, stock, available, revenue)" if language == "en" else "Produits (nom, prix, stock, disponible, revenu)"}: {top_prod}')
 
     if results.get("clients"):
         top_clients = [
             {
-                "nom":          f"{d.get('nom', '')} {d.get('prenom', '')}".strip() or "Inconnu",
-                "email":        d.get("email", ""),
-                "telephone":    d.get("telephone", ""),
-                "adresse":      d.get("adresse", ""),
-                "type":         d.get("type", ""),
-                "total_spent":  round(d.get("total_spent", 0), 2),
+                "nom": f"{d.get('nom', '')} {d.get('prenom', '')}".strip() or ("Unknown" if language == "en" else "Inconnu"),
+                "email": d.get("email", ""),
+                "telephone": d.get("telephone", ""),
+                "adresse": d.get("adresse", ""),
+                "type": d.get("type", ""),
+                "total_spent": round(d.get("total_spent", 0), 2),
                 "nb_commandes": d.get("nb_commandes", 0),
             }
             for d in results["clients"]
         ]
-        data_parts.append(f"Clients (nom, email, telephone, adresse, type, total_spent, nb_commandes): {top_clients}")
+        data_parts.append(f'{"Clients (name, email, phone, address, type, total_spent, orders)" if language == "en" else "Clients (nom, email, telephone, adresse, type, total_spent, nb_commandes)"}: {top_clients}')
 
     if results.get("orders"):
         orders = [
             {
-                "client":  d.get("clientNom", "Inconnu"),
-                "date":    str(d.get("dateCommande", ""))[:10],
-                "statut":  d.get("statut", ""),
+                "client": d.get("clientNom", "Unknown" if language == "en" else "Inconnu"),
+                "date": str(d.get("dateCommande", ""))[:10],
+                "statut": d.get("statut", ""),
                 "montant": d.get("montantTotal", 0),
-                "notes":   d.get("notes", ""),
+                "notes": d.get("notes", ""),
             }
             for d in results["orders"]
         ]
-        data_parts.append(f"Commandes récentes (client, date, statut, montant): {orders}")
+        data_parts.append(f'{"Recent orders (client, date, status, amount)" if language == "en" else "Commandes recentes (client, date, statut, montant)"}: {orders}')
 
     if results.get("invoices"):
         invoices = [
             {
-                "numero":  d.get("numeroFacture", ""),
-                "client":  d.get("clientNom", "Inconnu"),
-                "date":    str(d.get("dateEmission", ""))[:10],
+                "numero": d.get("numeroFacture", ""),
+                "client": d.get("clientNom", "Unknown" if language == "en" else "Inconnu"),
+                "date": str(d.get("dateEmission", ""))[:10],
                 "montant": d.get("montantTotal", 0),
-                "statut":  d.get("statutPaiement", ""),
-                "payéLe":  str(d.get("datePaiement", ""))[:10] if d.get("datePaiement") else "Non payée",
+                "statut": d.get("statutPaiement", ""),
+                "payeLe": str(d.get("datePaiement", ""))[:10] if d.get("datePaiement") else ("Unpaid" if language == "en" else "Non payee"),
             }
             for d in results["invoices"]
         ]
-        data_parts.append(f"Factures (numero, client, date, montant, statut, payéLe): {invoices}")
+        data_parts.append(f'{"Invoices (number, client, date, amount, status, paid_on)" if language == "en" else "Factures (numero, client, date, montant, statut, payeLe)"}: {invoices}')
 
     if results.get("prospects"):
         prospects = [
             {
-                "nom":        f"{d.get('nom', '')} {d.get('prenom', '')}".strip(),
-                "email":      d.get("email", ""),
-                "telephone":  d.get("telephone", ""),
+                "nom": f"{d.get('nom', '')} {d.get('prenom', '')}".strip(),
+                "email": d.get("email", ""),
+                "telephone": d.get("telephone", ""),
                 "entreprise": d.get("entreprise", ""),
-                "statut":     d.get("statut", ""),
+                "statut": d.get("statut", ""),
             }
             for d in results["prospects"]
         ]
-        data_parts.append(f"Prospects (nom, email, entreprise, statut): {prospects}")
+        data_parts.append(f'{"Prospects (name, email, company, status)" if language == "en" else "Prospects (nom, email, entreprise, statut)"}: {prospects}')
 
     if results.get("interactions"):
         interactions = [
             {
-                "type":        d.get("type", ""),
-                "client":      d.get("clientNom", "Inconnu"),
-                "date":        str(d.get("date", ""))[:10],
+                "type": d.get("type", ""),
+                "client": d.get("clientNom", "Unknown" if language == "en" else "Inconnu"),
+                "date": str(d.get("date", ""))[:10],
                 "description": d.get("description", "")[:200],
             }
             for d in results["interactions"]
         ]
-        data_parts.append(f"Interactions récentes (type, client, date, description): {interactions}")
+        data_parts.append(f'{"Recent interactions (type, client, date, description)" if language == "en" else "Interactions recentes (type, client, date, description)"}: {interactions}')
 
     if results.get("employees"):
         employees = [
             {
-                "nom":    f"{d.get('nom', '')} {d.get('prenom', '')}".strip(),
-                "email":  d.get("email", ""),
-                "role":   d.get("role", ""),
-                "actif":  d.get("actif", False),
+                "nom": f"{d.get('nom', '')} {d.get('prenom', '')}".strip(),
+                "email": d.get("email", ""),
+                "role": d.get("role", ""),
+                "actif": d.get("actif", False),
             }
             for d in results["employees"]
         ]
-        data_parts.append(f"Employés (nom, email, role): {employees}")
+        data_parts.append(f'{"Employees (name, email, role)" if language == "en" else "Employes (nom, email, role)"}: {employees}')
 
-    # ── 6. Build prompt and call Groq ──────────────────────────────
     user_message_with_data = question
     if data_parts:
-        user_message_with_data += "\n\nDonnées disponibles:\n" + "\n".join(data_parts)
+        user_message_with_data += ("\n\nAvailable data:\n" if language == "en" else "\n\nDonnees disponibles:\n") + "\n".join(data_parts)
 
     messages = _build_messages(history, system_prompt, user_message_with_data)
     explanation = await _groq_call(messages)
 
     if not explanation:
-        explanation = _format_fallback(question, data_parts)
+        if not data_parts:
+            explanation = (
+                "I'm here to help. Ask me a question about your CRM/ERP data."
+                if language == "en"
+                else
+                "Je suis la pour vous aider. Posez-moi une question sur vos donnees CRM/ERP."
+            )
+        else:
+            explanation = (
+                f'Here is the available data for: "{question}"\n\n' if language == "en" else f'Voici les donnees disponibles pour : "{question}"\n\n'
+            ) + "\n".join(data_parts)
 
     return {
-        "answer":       explanation,
-        "chart":        None,
-        "predictions":  predictions_preview,
+        "answer": explanation,
+        "chart": None,
+        "predictions": predictions_preview,
         "top_products": top_prod,
-        "top_clients":  top_clients,
+        "top_clients": top_clients,
     }

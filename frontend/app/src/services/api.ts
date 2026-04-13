@@ -327,10 +327,14 @@ class ApiService {
   }
 
   // Assistant — fixed endpoint from /assistant/ask to /assistant/sales_forecast
-  async askAssistant(question: string, history?: { role: string; content: string }[]): Promise<AssistantResponse> {
+  async askAssistant(
+    question: string,
+    history?: { role: string; content: string }[],
+    language?: string
+  ): Promise<AssistantResponse> {
     return this.request<AssistantResponse>('/assistant/sales_forecast', {
       method: 'POST',
-      body: JSON.stringify({ question, history: history ?? [] }),
+      body: JSON.stringify({ question, history: history ?? [], language }),
     });
   }
 }
