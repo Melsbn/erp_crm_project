@@ -51,7 +51,12 @@ async def get_users(
 ):
     query = {}
     if is_admin(current_user):
-        query = {"role": ROLE_EMPLOYE}
+        query = {
+            "$or": [
+                {"role": ROLE_EMPLOYE},
+                {PRIMARY_SUPERVISOR_FIELD: True, "role": ROLE_SUPERVISEUR},
+            ]
+        }
 
     users = await db[UserModel.collection].find(query).to_list(1000)
     return serialize_docs(users)

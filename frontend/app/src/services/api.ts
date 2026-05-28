@@ -42,8 +42,21 @@ class ApiService {
       },
     });
 
-    // Handle 401 Unauthorized - redirect to login
-    if (response.status === 401) {
+    // Handle missing/expired auth consistently
+    if (response.status === 401 || response.status === 403) {
+      const authError = await response
+        .json()
+        .catch(() => ({ detail: 'Session expired. Please login again.' }));
+      const detail = String(authError.detail || '');
+      const isAuthFailure =
+        response.status === 401 ||
+        detail.toLowerCase() === 'not authenticated' ||
+        detail.toLowerCase().includes('credentials');
+
+      if (!isAuthFailure) {
+        throw new Error(authError.detail || `HTTP error! status: ${response.status}`);
+      }
+
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       sessionStorage.removeItem('authToken');

@@ -102,6 +102,7 @@ class UserInDB(UserBase):
 class UserResponse(UserBase):
     id: str
     dateCreation: str
+    is_primary_supervisor: bool = False
 
     class Config:
         from_attributes = True

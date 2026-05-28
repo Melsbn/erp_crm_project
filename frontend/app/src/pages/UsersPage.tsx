@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Edit2, Trash2, UserCheck, UserX } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, UserCheck, UserX, Pin } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -78,6 +78,7 @@ export function UsersPage() {
       : [UserRole.EMPLOYE];
 
   const isPrimarySupervisor = Boolean(selectedUser?.is_primary_supervisor);
+  const getIsLockedSupervisor = (user: (typeof users)[number]) => Boolean(user.is_primary_supervisor);
 
   const handleAdd = async () => {
     try {
@@ -283,7 +284,17 @@ export function UsersPage() {
               {filteredUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">
-                    {user.prenom} {user.nom}
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {user.prenom} {user.nom}
+                      </span>
+                      {getIsLockedSupervisor(user) && (
+                        <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
+                          <Pin className="mr-1 h-3 w-3" />
+                          Principal
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
@@ -396,6 +407,26 @@ export function UsersPage() {
                       <SelectItem value="inactif">{t('common.inactive')}</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </>
+            )}
+            {isPrimarySupervisor && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-role-locked">{t('common.role')}</Label>
+                  <Input
+                    id="edit-role-locked"
+                    value={t(`statusLabels.role.${formData.role}`)}
+                    disabled
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-status-locked">{t('common.status')}</Label>
+                  <Input
+                    id="edit-status-locked"
+                    value={formData.actif ? t('common.active') : t('common.inactive')}
+                    disabled
+                  />
                 </div>
               </>
             )}

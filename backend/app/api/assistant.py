@@ -1,319 +1,718 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-import pandas as pd
-import httpx
 import asyncio
+import json
+import re
+import unicodedata
 
-from app.core.database import get_database
+import httpx
+import pandas as pd
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.api.deps import ROLE_ADMIN, ROLE_EMPLOYE, ROLE_SUPERVISEUR, require_roles
 from app.core.config import settings
-from app.models import CommandeModel, LigneCommandeModel
-from app.api.deps import require_roles, ROLE_ADMIN, ROLE_SUPERVISEUR, ROLE_EMPLOYE
+from app.core.database import get_database
 
 router = APIRouter()
+
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 MAX_FORECAST_MONTHS = 3
-MAX_DOCS = 2000
 MAX_HISTORY_TURNS = 8
+MAX_SAMPLE_DOCS = 12
+MAX_TEXT_MATCHES = 10
+MAX_FIELD_VALUE_LENGTH = 240
 
 INSTANT_REPLIES = {
-    "merci":         "De rien ! N'hésitez pas si vous avez d'autres questions.",
-    "super":         "Ravi de pouvoir vous aider !",
-    "ok":            "D'accord ! Autre chose ?",
-    "bien":          "Tant mieux ! Je suis là si vous avez d'autres questions.",
-    "parfait":       "Parfait ! N'hésitez pas si vous avez d'autres questions.",
-    "au revoir":     "Au revoir ! Bonne journée.",
-    "bonne journée": "Merci, bonne journée à vous aussi !",
-    "bonjour":       "Bonjour ! Comment puis-je vous aider ?",
-    "bonsoir":       "Bonsoir ! Comment puis-je vous aider ?",
-    "salut":         "Salut ! Comment puis-je vous aider ?",
-    "stp":           "Bien sûr, je vous écoute.",
-    "svp":           "Bien sûr, je vous écoute.",
+    "fr": {
+        "merci": "De rien ! N'hesitez pas si vous avez d'autres questions.",
+        "super": "Ravi de pouvoir vous aider !",
+        "ok": "D'accord ! Autre chose ?",
+        "bien": "Tant mieux ! Je suis la si vous avez d'autres questions.",
+        "parfait": "Parfait ! N'hesitez pas si vous avez d'autres questions.",
+        "au revoir": "Au revoir ! Bonne journee.",
+        "bonne journee": "Merci, bonne journee a vous aussi !",
+        "bonjour": "Bonjour ! Comment puis-je vous aider ?",
+        "bonsoir": "Bonsoir ! Comment puis-je vous aider ?",
+        "salut": "Salut ! Comment puis-je vous aider ?",
+        "stp": "Bien sur, je vous ecoute.",
+        "svp": "Bien sur, je vous ecoute.",
+    },
+    "en": {
+        "thanks": "You're welcome! Let me know if you need anything else.",
+        "thank you": "You're welcome! Let me know if you need anything else.",
+        "great": "Glad I could help!",
+        "ok": "Alright! Anything else?",
+        "perfect": "Perfect! Let me know if you need anything else.",
+        "goodbye": "Goodbye! Have a great day.",
+        "bye": "Goodbye! Have a great day.",
+        "hello": "Hello! How can I help you?",
+        "hi": "Hi! How can I help you?",
+        "please": "Of course, I'm listening.",
+    },
+}
+
+COLLECTION_HINTS = {
+    "users": {
+        "label_en": "users/employees",
+        "label_fr": "utilisateurs/employes",
+        "keywords": [
+            "user", "users", "employee", "employees", "employe", "employes",
+            "admin", "supervisor", "role", "team", "equipe", "vendeur", "commercial",
+        ],
+        "text_fields": ["nom", "prenom", "email", "role"],
+        "sort_field": "dateCreation",
+    },
+    "clients": {
+        "label_en": "clients",
+        "label_fr": "clients",
+        "keywords": [
+            "client", "clients", "customer", "customers", "buyer", "acheteur",
+            "email", "phone", "telephone", "address", "adresse", "entreprise", "company",
+        ],
+        "text_fields": ["nom", "prenom", "email", "telephone", "adresse", "entreprise", "type"],
+        "sort_field": "dateCreation",
+    },
+    "prospects": {
+        "label_en": "prospects",
+        "label_fr": "prospects",
+        "keywords": [
+            "prospect", "prospects", "lead", "leads", "pipeline", "qualified",
+            "qualifie", "contacte", "contacted",
+        ],
+        "text_fields": ["nom", "prenom", "email", "telephone", "entreprise", "statut"],
+        "sort_field": "dateCreation",
+    },
+    "categories": {
+        "label_en": "categories",
+        "label_fr": "categories",
+        "keywords": ["category", "categories", "categorie", "catalog", "catalogue"],
+        "text_fields": ["nom", "description"],
+        "sort_field": "dateCreation",
+    },
+    "produits": {
+        "label_en": "products",
+        "label_fr": "produits",
+        "keywords": [
+            "product", "products", "produit", "produits", "price", "prix",
+            "stock", "available", "disponible", "article", "articles",
+        ],
+        "text_fields": ["nom", "description"],
+        "sort_field": "dateCreation",
+    },
+    "commandes": {
+        "label_en": "orders",
+        "label_fr": "commandes",
+        "keywords": [
+            "order", "orders", "commande", "commandes", "sales", "sale",
+            "vente", "ventes", "revenue", "revenu", "status", "statut",
+            "delivery", "livraison",
+        ],
+        "text_fields": ["statut", "notes"],
+        "sort_field": "dateCommande",
+    },
+    "lignes_commande": {
+        "label_en": "order lines",
+        "label_fr": "lignes de commande",
+        "keywords": ["line", "lines", "ligne", "lignes", "quantity", "quantite", "unit price", "prix unitaire"],
+        "text_fields": [],
+        "sort_field": "dateCreation",
+    },
+    "factures": {
+        "label_en": "invoices",
+        "label_fr": "factures",
+        "keywords": [
+            "invoice", "invoices", "facture", "factures", "payment", "payments",
+            "paiement", "paid", "unpaid", "impaye", "pending", "en attente",
+        ],
+        "text_fields": ["numeroFacture", "statutPaiement"],
+        "sort_field": "dateEmission",
+    },
+    "paiements": {
+        "label_en": "payments",
+        "label_fr": "paiements",
+        "keywords": ["payment", "payments", "paiement", "paiements", "reference", "virement", "carte", "cash", "especes"],
+        "text_fields": ["reference", "methode"],
+        "sort_field": "datePaiement",
+    },
+    "interactions": {
+        "label_en": "interactions",
+        "label_fr": "interactions",
+        "keywords": [
+            "interaction", "interactions", "call", "appel", "meeting", "reunion",
+            "email", "follow-up", "suivi", "history", "historique",
+        ],
+        "text_fields": ["type", "description"],
+        "sort_field": "date",
+    },
+    "rapports": {
+        "label_en": "reports",
+        "label_fr": "rapports",
+        "keywords": ["report", "reports", "rapport", "rapports", "performance"],
+        "text_fields": ["type"],
+        "sort_field": "dateGeneration",
+    },
 }
 
 
-# ================================================================
-# Groq
-# ================================================================
-
-async def _groq_call(messages: List[Dict], temperature: float = 0.3) -> str:
+async def _groq_call(messages: List[Dict[str, str]], temperature: float = 0.1) -> str:
     if not settings.GROQ_API_KEY:
         return ""
+
     payload = {
         "model": settings.GROQ_MODEL,
         "messages": messages,
         "temperature": temperature,
-        "max_tokens": 1024,
+        "max_tokens": 1200,
     }
     headers = {
         "Authorization": f"Bearer {settings.GROQ_API_KEY}",
         "Content-Type": "application/json",
     }
+
     for attempt in range(3):
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.post(GROQ_API_URL, json=payload, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(GROQ_API_URL, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
             return data["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            print(f"Groq attempt {attempt} failed: {e}")
+        except Exception as exc:
+            print(f"Groq attempt {attempt + 1} failed: {exc}")
             if attempt < 2:
                 await asyncio.sleep(1.0)
+
     return ""
 
 
-# ================================================================
-# Intent detection
-# ================================================================
-
-def _detect_intent(question: str, history_text: str) -> Dict[str, bool]:
-    q = question.lower() + " " + history_text.lower()
-    return {
-        "sales":        any(w in q for w in ["vente", "ventes", "chiffre", "prévision", "forecast", "revenu", "revenus", "mois", "mensuel", "croissance", "pourcentage", "ca ", "c.a"]),
-        "products":     any(w in q for w in ["produit", "produits", "article", "articles", "stock", "prix", "catalogue", "disponible", "populaire"]),
-        "clients":      any(w in q for w in ["client", "clients", "acheteur", "dépensé", "depensé", "trie", "montant", "email", "contact", "telephone", "adresse", "meilleur", "qui ", "son ", "leur "]),
-        "orders":       any(w in q for w in ["commande", "commandes", "livraison", "livré", "annulé", "confirmé", "brouillon", "en cours"]),
-        "invoices":     any(w in q for w in ["facture", "factures", "paiement", "paiements", "impayé", "retard", "réglé", "montant dû", "en attente"]),
-        "prospects":    any(w in q for w in ["prospect", "prospects", "lead", "leads", "pipeline", "converti", "qualifié", "nouveau prospect", "contacté"]),
-        "interactions": any(w in q for w in ["interaction", "interactions", "appel", "email envoyé", "réunion", "rendez-vous", "historique", "suivi"]),
-        "employees":    any(w in q for w in ["employé", "employés", "utilisateur", "utilisateurs", "vendeur", "vendeurs", "équipe", "performance"]),
-    }
+def _normalize_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value or "")
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch)).lower()
 
 
-# ================================================================
-# History helpers
-# ================================================================
+def _contains_any(text: str, values: List[str]) -> bool:
+    return any(value in text for value in values)
 
-def _trim_history(history: List[Dict]) -> List[Dict]:
+
+def _trim_history(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     max_items = MAX_HISTORY_TURNS * 2
     return history[-max_items:] if len(history) > max_items else history
 
 
-def _strip_charts(history: List[Dict]) -> List[Dict]:
-    cleaned = []
+def _strip_charts(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    cleaned: List[Dict[str, Any]] = []
     for msg in history:
         content = msg.get("content", "")
         if isinstance(content, str) and "data:image" in content:
-            content = "[graphique omis]"
+            content = "[chart omitted]"
         cleaned.append({**msg, "content": content})
     return cleaned
 
 
-def _build_messages(history: List[Dict], system_prompt: str, new_user_message: str) -> List[Dict]:
-    messages = [{"role": "system", "content": system_prompt}]
+def _build_messages(history: List[Dict[str, Any]], system_prompt: str, new_user_message: str) -> List[Dict[str, str]]:
+    messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
     trimmed = _trim_history(_strip_charts(history[1:]))
     for msg in trimmed:
         role = "assistant" if msg.get("role") == "assistant" else "user"
-        content = msg.get("content", "").strip()
+        content = str(msg.get("content", "")).strip()
         if content:
             messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": new_user_message})
     return messages
 
 
-# ================================================================
-# Forecast computation
-# ================================================================
+def _detect_language(payload_language: Any, question: str) -> str:
+    raw = str(payload_language or "").lower().strip()
+    if raw.startswith("en"):
+        return "en"
+    if raw.startswith("fr"):
+        return "fr"
+
+    q = _normalize_text(question)
+    if _contains_any(q, [" how ", " what ", " which ", "who ", "invoice", "order", "client", "sales", "revenue"]):
+        return "en"
+    return "fr"
+
+
+def _is_count_question(question: str) -> bool:
+    q = _normalize_text(question)
+    return _contains_any(q, ["how many", "combien", "number of", "nombre de", "count", "total "])
+
+
+def _is_unpaid_invoice_question(question: str) -> bool:
+    q = _normalize_text(question)
+    return _contains_any(
+        q,
+        [
+            "unpaid invoice",
+            "unpaid invoices",
+            "outstanding invoice",
+            "outstanding invoices",
+            "facture impayee",
+            "factures impayees",
+            "facture en attente",
+            "factures en attente",
+        ],
+    )
+
+
+def _is_best_salesperson_question(question: str) -> bool:
+    q = _normalize_text(question)
+    return _contains_any(
+        q,
+        [
+            "best salesperson",
+            "top salesperson",
+            "best seller",
+            "top seller",
+            "meilleur vendeur",
+            "meilleur commercial",
+            "top vendeur",
+            "top commercial",
+        ],
+    )
+
+
+def _safe_scalar(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return round(value, 2) if isinstance(value, float) else value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, list):
+        return [_safe_scalar(item) for item in value[:8]]
+    if isinstance(value, dict):
+        return {str(key): _safe_scalar(val) for key, val in value.items()}
+    return str(value)[:MAX_FIELD_VALUE_LENGTH]
+
+
+def _sanitize_document(doc: Dict[str, Any]) -> Dict[str, Any]:
+    clean: Dict[str, Any] = {}
+    for key, value in doc.items():
+        if key in {"_id", "passwordHash"}:
+            continue
+        clean[key] = _safe_scalar(value)
+    return clean
+
+
+def _serialize_for_prompt(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=True, default=str)
+
+
+def _select_collections(question: str, history_text: str, available_collections: List[str]) -> List[str]:
+    text = _normalize_text(question)
+    if history_text:
+        text += " " + _normalize_text(history_text)
+
+    selected = []
+    for collection in available_collections:
+        hints = COLLECTION_HINTS.get(collection)
+        if hints and _contains_any(text, hints["keywords"]):
+            selected.append(collection)
+
+    if selected:
+        return selected
+
+    preferred = [
+        "clients",
+        "prospects",
+        "produits",
+        "commandes",
+        "lignes_commande",
+        "factures",
+        "paiements",
+        "interactions",
+        "users",
+        "categories",
+        "rapports",
+    ]
+    return [name for name in preferred if name in available_collections]
+
+
+def _build_regex_tokens(question: str) -> List[str]:
+    raw_tokens = re.findall(r"[A-Za-z0-9@._-]{3,}", question or "")
+    stop_words = {
+        "what", "which", "show", "list", "give", "with", "from", "that", "this",
+        "combien", "montre", "liste", "avec", "pour", "dans", "the", "les", "des",
+        "are", "was", "were", "est", "sont", "invoice", "order", "client", "product",
+        "commande", "facture", "produit", "prospect", "user", "employee",
+    }
+    tokens = []
+    for token in raw_tokens:
+        normalized = _normalize_text(token)
+        if normalized not in stop_words and len(normalized) >= 3:
+            tokens.append(token)
+    return tokens[:6]
+
+
+async def _fetch_collection_counts(db, collections: List[str]) -> Dict[str, int]:
+    tasks = [db[name].count_documents({}) for name in collections]
+    values = await asyncio.gather(*tasks)
+    return {name: values[index] for index, name in enumerate(collections)}
+
+
+async def _fetch_collection_samples(db, collections: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+    results: Dict[str, List[Dict[str, Any]]] = {}
+    for name in collections:
+        hints = COLLECTION_HINTS.get(name, {})
+        sort_field = hints.get("sort_field")
+        cursor = db[name].find({}, {"passwordHash": 0})
+        if sort_field:
+            cursor = cursor.sort(sort_field, -1)
+        docs = await cursor.limit(MAX_SAMPLE_DOCS).to_list(MAX_SAMPLE_DOCS)
+        results[name] = [_sanitize_document(doc) for doc in docs]
+    return results
+
+
+async def _find_text_matches(db, collections: List[str], question: str) -> Dict[str, List[Dict[str, Any]]]:
+    tokens = _build_regex_tokens(question)
+    if not tokens:
+        return {}
+
+    matches: Dict[str, List[Dict[str, Any]]] = {}
+    for name in collections:
+        text_fields = COLLECTION_HINTS.get(name, {}).get("text_fields", [])
+        if not text_fields:
+            continue
+
+        clauses: List[Dict[str, Any]] = []
+        for token in tokens:
+            for field in text_fields:
+                clauses.append({field: {"$regex": re.escape(token), "$options": "i"}})
+
+        docs = await db[name].find({"$or": clauses}, {"passwordHash": 0}).limit(MAX_TEXT_MATCHES).to_list(MAX_TEXT_MATCHES)
+        if docs:
+            matches[name] = [_sanitize_document(doc) for doc in docs]
+
+    return matches
+
 
 def forecast_sales(df: pd.DataFrame, months_ahead: int = MAX_FORECAST_MONTHS) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(columns=["month", "predicted_sales"])
-    df = df.copy()
-    df["month"] = pd.to_datetime(df["month"])
-    df["predicted_sales"] = df["total"].rolling(3, min_periods=1).mean()
-    recent = df["predicted_sales"].dropna().tail(3).values
+
+    working = df.copy()
+    working["month"] = pd.to_datetime(working["month"])
+    working["predicted_sales"] = working["total"].rolling(3, min_periods=1).mean()
+    recent = working["predicted_sales"].dropna().tail(3).values
     trend = (recent[-1] - recent[0]) / (len(recent) - 1) if len(recent) >= 2 else 0.0
-    last_month = df["month"].max()
-    last_pred = df["predicted_sales"].iloc[-1]
+    last_month = working["month"].max()
+    last_pred = working["predicted_sales"].iloc[-1]
+
     future_rows = []
-    for i in range(1, months_ahead + 1):
-        next_month = last_month + pd.DateOffset(months=i)
-        next_pred = last_pred + trend * i
+    for index in range(1, months_ahead + 1):
+        next_month = last_month + pd.DateOffset(months=index)
+        next_pred = last_pred + trend * index
         future_rows.append({"month": next_month, "predicted_sales": round(next_pred, 2)})
+
     if future_rows:
-        df = pd.concat([df, pd.DataFrame(future_rows)], ignore_index=True)
-    df = df[["month", "predicted_sales"]].copy()
-    df["predicted_sales"] = df["predicted_sales"].fillna(0).round(2)
-    return df
+        working = pd.concat([working, pd.DataFrame(future_rows)], ignore_index=True)
+
+    working = working[["month", "predicted_sales"]].copy()
+    working["predicted_sales"] = working["predicted_sales"].fillna(0).round(2)
+    return working
 
 
-# ================================================================
-# Serialization
-# ================================================================
-
-def safe_records(df: pd.DataFrame) -> List[Dict]:
-    records = []
+def _safe_records(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
     for row in df.to_dict(orient="records"):
-        safe_row = {}
-        for k, v in row.items():
-            if isinstance(v, (pd.Timestamp, datetime)):
-                safe_row[k] = v.isoformat()
-            elif isinstance(v, float) and pd.isna(v):
-                safe_row[k] = None
+        clean: Dict[str, Any] = {}
+        for key, value in row.items():
+            if isinstance(value, (pd.Timestamp, datetime)):
+                clean[key] = value.isoformat()
+            elif isinstance(value, float) and pd.isna(value):
+                clean[key] = None
             else:
-                safe_row[k] = v
-        records.append(safe_row)
-    return records
+                clean[key] = _safe_scalar(value)
+        rows.append(clean)
+    return rows
 
 
-# ================================================================
-# MongoDB pipelines
-# ================================================================
+async def _compute_verified_metrics(db) -> Dict[str, Any]:
+    metrics: Dict[str, Any] = {}
 
-def _pipeline_sales():
-    return [
-        {"$sort": {"dateCommande": -1}},
-        {"$limit": MAX_DOCS},
-        {"$project": {
-            "month": {"$dateTrunc": {"date": {"$toDate": "$dateCommande"}, "unit": "month"}},
-            "total": "$montantTotal",
-        }},
-        {"$group": {"_id": "$month", "total": {"$sum": "$total"}}},
-        {"$sort": {"_id": 1}},
+    collection_names = await db.list_collection_names()
+    metrics["collection_counts"] = await _fetch_collection_counts(db, collection_names)
+
+    if "commandes" in collection_names:
+        order_status_rows = await db["commandes"].aggregate(
+            [
+                {"$group": {"_id": "$statut", "count": {"$sum": 1}, "total": {"$sum": "$montantTotal"}}},
+                {"$sort": {"count": -1, "_id": 1}},
+            ]
+        ).to_list(20)
+        metrics["orders_by_status"] = [
+            {"statut": row.get("_id") or "UNKNOWN", "count": row.get("count", 0), "total": round(row.get("total", 0), 2)}
+            for row in order_status_rows
+        ]
+
+        delivered_sales_rows = await db["commandes"].aggregate(
+            [
+                {"$match": {"statut": {"$in": ["CONFIRMEE", "LIVREE"]}}},
+                {"$group": {"_id": None, "count": {"$sum": 1}, "total": {"$sum": "$montantTotal"}}},
+            ]
+        ).to_list(1)
+        delivered_sales = delivered_sales_rows[0] if delivered_sales_rows else {"count": 0, "total": 0}
+        metrics["sales_summary"] = {
+            "count": delivered_sales.get("count", 0),
+            "total": round(delivered_sales.get("total", 0), 2),
+        }
+
+        monthly_rows = await db["commandes"].aggregate(
+            [
+                {"$project": {"month": {"$dateTrunc": {"date": {"$toDate": "$dateCommande"}, "unit": "month"}}, "total": "$montantTotal"}},
+                {"$group": {"_id": "$month", "total": {"$sum": "$total"}}},
+                {"$sort": {"_id": 1}},
+            ]
+        ).to_list(120)
+        if monthly_rows:
+            monthly_df = pd.DataFrame([{"month": row["_id"], "total": row["total"]} for row in monthly_rows])
+            metrics["sales_forecast"] = _safe_records(forecast_sales(monthly_df))
+
+        top_salesperson_rows = await db["commandes"].aggregate(
+            [
+                {"$match": {"statut": {"$in": ["CONFIRMEE", "LIVREE"]}}},
+                {"$group": {"_id": "$userId", "salesCount": {"$sum": 1}, "salesTotal": {"$sum": "$montantTotal"}}},
+                {"$sort": {"salesTotal": -1}},
+                {"$limit": 5},
+                {
+                    "$lookup": {
+                        "from": "users",
+                        "let": {"userId": "$_id"},
+                        "pipeline": [
+                            {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, {"$toString": "$$userId"}]}}},
+                            {"$project": {"nom": 1, "prenom": 1, "email": 1, "role": 1}},
+                        ],
+                        "as": "user",
+                    }
+                },
+                {"$unwind": {"path": "$user", "preserveNullAndEmptyArrays": True}},
+                {"$project": {"salesCount": 1, "salesTotal": 1, "nom": "$user.nom", "prenom": "$user.prenom", "email": "$user.email", "role": "$user.role"}},
+            ]
+        ).to_list(5)
+        metrics["top_salespeople"] = [
+            {
+                "nom": f"{row.get('nom', '')} {row.get('prenom', '')}".strip() or "Unknown",
+                "email": row.get("email", ""),
+                "role": row.get("role", ""),
+                "salesCount": row.get("salesCount", 0),
+                "salesTotal": round(row.get("salesTotal", 0), 2),
+            }
+            for row in top_salesperson_rows
+        ]
+
+        top_client_rows = await db["commandes"].aggregate(
+            [
+                {"$group": {"_id": "$clientId", "orderCount": {"$sum": 1}, "totalSpent": {"$sum": "$montantTotal"}}},
+                {"$sort": {"totalSpent": -1}},
+                {"$limit": 10},
+                {
+                    "$lookup": {
+                        "from": "clients",
+                        "let": {"clientId": "$_id"},
+                        "pipeline": [
+                            {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, {"$toString": "$$clientId"}]}}},
+                            {"$project": {"nom": 1, "prenom": 1, "email": 1, "telephone": 1, "adresse": 1, "type": 1}},
+                        ],
+                        "as": "client",
+                    }
+                },
+                {"$unwind": {"path": "$client", "preserveNullAndEmptyArrays": True}},
+                {"$project": {"orderCount": 1, "totalSpent": 1, "nom": "$client.nom", "prenom": "$client.prenom", "email": "$client.email", "telephone": "$client.telephone", "adresse": "$client.adresse", "type": "$client.type"}},
+            ]
+        ).to_list(10)
+        metrics["top_clients"] = [
+            {
+                "nom": f"{row.get('nom', '')} {row.get('prenom', '')}".strip() or "Unknown",
+                "email": row.get("email", ""),
+                "telephone": row.get("telephone", ""),
+                "adresse": row.get("adresse", ""),
+                "type": row.get("type", ""),
+                "orderCount": row.get("orderCount", 0),
+                "totalSpent": round(row.get("totalSpent", 0), 2),
+            }
+            for row in top_client_rows
+        ]
+
+    if "factures" in collection_names:
+        invoice_status_rows = await db["factures"].aggregate(
+            [
+                {"$group": {"_id": "$statutPaiement", "count": {"$sum": 1}, "total": {"$sum": "$montantTotal"}}},
+                {"$sort": {"count": -1, "_id": 1}},
+            ]
+        ).to_list(20)
+        metrics["invoices_by_status"] = [
+            {"statut": row.get("_id") or "UNKNOWN", "count": row.get("count", 0), "total": round(row.get("total", 0), 2)}
+            for row in invoice_status_rows
+        ]
+
+        unpaid_rows = await db["factures"].aggregate(
+            [
+                {"$match": {"statutPaiement": {"$in": ["EN_ATTENTE", "PARTIELLE"]}}},
+                {"$group": {"_id": None, "count": {"$sum": 1}, "total": {"$sum": "$montantTotal"}}},
+            ]
+        ).to_list(1)
+        unpaid = unpaid_rows[0] if unpaid_rows else {"count": 0, "total": 0}
+        metrics["unpaid_invoices"] = {
+            "count": unpaid.get("count", 0),
+            "total": round(unpaid.get("total", 0), 2),
+        }
+
+    if "lignes_commande" in collection_names:
+        top_product_rows = await db["lignes_commande"].aggregate(
+            [
+                {"$group": {"_id": "$produitId", "quantitySold": {"$sum": "$quantite"}, "revenue": {"$sum": {"$ifNull": ["$sousTotal", {"$multiply": ["$quantite", "$prixUnitaire"]}]}}}},
+                {"$sort": {"revenue": -1}},
+                {"$limit": 10},
+                {
+                    "$lookup": {
+                        "from": "produits",
+                        "let": {"productId": "$_id"},
+                        "pipeline": [
+                            {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, {"$toString": "$$productId"}]}}},
+                            {"$project": {"nom": 1, "description": 1, "prix": 1, "stock": 1, "disponible": 1}},
+                        ],
+                        "as": "product",
+                    }
+                },
+                {"$unwind": {"path": "$product", "preserveNullAndEmptyArrays": True}},
+                {"$project": {"quantitySold": 1, "revenue": 1, "nom": "$product.nom", "description": "$product.description", "prix": "$product.prix", "stock": "$product.stock", "disponible": "$product.disponible"}},
+            ]
+        ).to_list(10)
+        metrics["top_products"] = [
+            {
+                "nom": row.get("nom") or "Unknown",
+                "description": row.get("description", ""),
+                "prix": round(row.get("prix", 0), 2),
+                "stock": row.get("stock", 0),
+                "disponible": row.get("disponible", False),
+                "quantitySold": row.get("quantitySold", 0),
+                "revenue": round(row.get("revenue", 0), 2),
+            }
+            for row in top_product_rows
+        ]
+
+    return metrics
+
+
+def _build_system_prompt(language: str) -> str:
+    if language == "en":
+        return (
+            "You are a CRM/ERP assistant. Answer only in English. "
+            "Use only the verified database briefing provided by the user message. "
+            "Never invent facts, totals, dates, names, or identifiers. "
+            "Treat recent_records as samples unless the briefing explicitly says the sample is complete. "
+            "If the briefing is insufficient, say that clearly. "
+            "Prefer exact numbers and concise reasoning. "
+            "Do not mention hidden technical fields such as _id or passwordHash."
+        )
+
+    return (
+        "Tu es un assistant CRM/ERP. Reponds uniquement en francais. "
+        "Utilise uniquement le briefing verifie de la base de donnees fourni dans le message utilisateur. "
+        "N'invente jamais de faits, montants, dates, noms ou identifiants. "
+        "Considere recent_records comme des echantillons sauf si le briefing dit explicitement que l echantillon est complet. "
+        "Si le briefing est insuffisant, dis-le clairement. "
+        "Privilegie les nombres exacts et un raisonnement concis. "
+        "Ne mentionne pas les champs techniques caches comme _id ou passwordHash."
+    )
+
+
+def _build_data_briefing(
+    question: str,
+    language: str,
+    collection_counts: Dict[str, int],
+    selected_collections: List[str],
+    samples: Dict[str, List[Dict[str, Any]]],
+    matches: Dict[str, List[Dict[str, Any]]],
+    metrics: Dict[str, Any],
+) -> str:
+    recent_section = [
+        {
+            "collection": name,
+            "total_records_in_collection": collection_counts.get(name, 0),
+            "sample_record_count": len(docs),
+            "sample_is_partial": len(docs) < collection_counts.get(name, 0),
+            "records": docs,
+        }
+        for name, docs in samples.items()
+        if docs
     ]
+    briefing = {
+        "question": question,
+        "selected_collections": selected_collections,
+        "database_inventory": collection_counts,
+        "selected_collection_totals": {
+            name: collection_counts.get(name, 0) for name in selected_collections
+        },
+        "verified_metrics": {
+            "sales_summary": metrics.get("sales_summary"),
+            "unpaid_invoices": metrics.get("unpaid_invoices"),
+            "orders_by_status": metrics.get("orders_by_status"),
+            "invoices_by_status": metrics.get("invoices_by_status"),
+            "top_salespeople": metrics.get("top_salespeople"),
+            "top_clients": metrics.get("top_clients"),
+            "top_products": metrics.get("top_products"),
+            "sales_forecast": metrics.get("sales_forecast"),
+        },
+        "matched_records": matches,
+        "recent_records": recent_section,
+    }
+
+    prefix = "Verified database briefing" if language == "en" else "Briefing verifie de la base de donnees"
+    return f"{prefix}:\n{_serialize_for_prompt(briefing)}"
 
 
-def _pipeline_prod():
-    return [
-        {"$sort": {"dateCommande": -1}},
-        {"$limit": MAX_DOCS},
-        {"$project": {
-            "produitId": 1,
-            "revenue": {"$multiply": ["$quantite", "$prixUnitaire"]},
-        }},
-        {"$group": {"_id": "$produitId", "predicted_revenue": {"$sum": "$revenue"}}},
-        {"$sort": {"predicted_revenue": -1}},
-        {"$limit": 5},
-        {"$addFields": {"produitIdObj": {"$cond": {"if": {"$eq": [{"$type": "$_id"}, "objectId"]}, "then": "$_id", "else": {"$toObjectId": "$_id"}}}}},
-        {"$lookup": {"from": "produits", "localField": "produitIdObj", "foreignField": "_id", "as": "produit"}},
-        {"$unwind": {"path": "$produit", "preserveNullAndEmptyArrays": True}},
-        {"$project": {
-            "predicted_revenue": 1,
-            "nom":         {"$ifNull": ["$produit.nom", "Produit inconnu"]},
-            "description": {"$ifNull": ["$produit.description", ""]},
-            "prix":        {"$ifNull": ["$produit.prix", 0]},
-            "stock":       {"$ifNull": ["$produit.stock", 0]},
-            "disponible":  {"$ifNull": ["$produit.disponible", False]},
-        }},
-    ]
+def _fallback_answer(
+    question: str,
+    language: str,
+    collection_counts: Dict[str, int],
+    selected_collections: List[str],
+    matches: Dict[str, List[Dict[str, Any]]],
+    metrics: Dict[str, Any],
+) -> str:
+    if _is_unpaid_invoice_question(question) and metrics.get("unpaid_invoices"):
+        unpaid = metrics["unpaid_invoices"]
+        if language == "en":
+            return f"There are {unpaid['count']} unpaid or partially paid invoices for a total of {unpaid['total']}."
+        return f"Il y a {unpaid['count']} factures impayees ou partiellement payees pour un total de {unpaid['total']}."
 
+    if _is_best_salesperson_question(question) and metrics.get("top_salespeople"):
+        top = metrics["top_salespeople"][0]
+        if language == "en":
+            return f"The best salesperson is {top['nom']} with {top['salesCount']} sales totaling {top['salesTotal']}."
+        return f"Le meilleur vendeur est {top['nom']} avec {top['salesCount']} ventes pour un total de {top['salesTotal']}."
 
-def _pipeline_clients():
-    return [
-        {"$sort": {"dateCommande": -1}},
-        {"$limit": MAX_DOCS},
-        {"$group": {"_id": "$clientId", "total_spent": {"$sum": "$montantTotal"}, "nb_commandes": {"$sum": 1}}},
-        {"$sort": {"total_spent": -1}},
-        {"$limit": 10},
-        {"$addFields": {"clientIdObj": {"$cond": {"if": {"$eq": [{"$type": "$_id"}, "objectId"]}, "then": "$_id", "else": {"$toObjectId": "$_id"}}}}},
-        {"$lookup": {"from": "clients", "localField": "clientIdObj", "foreignField": "_id", "as": "client"}},
-        {"$unwind": {"path": "$client", "preserveNullAndEmptyArrays": True}},
-        {"$project": {
-            "total_spent": 1, "nb_commandes": 1,
-            "nom":       {"$ifNull": ["$client.nom", "Inconnu"]},
-            "prenom":    {"$ifNull": ["$client.prenom", ""]},
-            "email":     {"$ifNull": ["$client.email", ""]},
-            "telephone": {"$ifNull": ["$client.telephone", ""]},
-            "adresse":   {"$ifNull": ["$client.adresse", ""]},
-            "type":      {"$ifNull": ["$client.type", ""]},
-        }},
-    ]
+    if _is_count_question(question):
+        normalized = _normalize_text(question)
+        for collection in selected_collections:
+            hints = COLLECTION_HINTS.get(collection, {})
+            if _contains_any(normalized, hints.get("keywords", [])):
+                count = collection_counts.get(collection, 0)
+                label = hints.get("label_en" if language == "en" else "label_fr", collection)
+                if language == "en":
+                    return f"There are {count} {label} in the database."
+                return f"Il y a {count} {label} dans la base de donnees."
 
+    if matches:
+        first_collection = next(iter(matches))
+        records = matches[first_collection][:3]
+        if language == "en":
+            return f"I found matching records in {first_collection}: {json.dumps(records, ensure_ascii=True)}"
+        return f"J'ai trouve des enregistrements correspondants dans {first_collection} : {json.dumps(records, ensure_ascii=True)}"
 
-def _pipeline_orders():
-    return [
-        {"$sort": {"dateCommande": -1}},
-        {"$limit": 50},
-        {"$addFields": {"clientIdObj": {"$cond": {"if": {"$eq": [{"$type": "$clientId"}, "objectId"]}, "then": "$clientId", "else": {"$toObjectId": "$clientId"}}}}},
-        {"$lookup": {"from": "clients", "localField": "clientIdObj", "foreignField": "_id", "as": "client"}},
-        {"$unwind": {"path": "$client", "preserveNullAndEmptyArrays": True}},
-        {"$project": {
-            "dateCommande": 1,
-            "statut":       1,
-            "montantTotal": 1,
-            "notes":        1,
-            "clientNom":    {"$ifNull": [{"$concat": ["$client.nom", " ", "$client.prenom"]}, "Inconnu"]},
-        }},
-    ]
+    summaries = []
+    for collection in selected_collections[:4]:
+        count = collection_counts.get(collection, 0)
+        label = COLLECTION_HINTS.get(collection, {}).get("label_en" if language == "en" else "label_fr", collection)
+        summaries.append(f"{label}: {count}")
 
+    if language == "en":
+        return f"I could not verify a more specific answer yet. Available verified counts: {', '.join(summaries)}."
+    return f"Je ne peux pas encore verifier une reponse plus precise. Comptes verifies disponibles : {', '.join(summaries)}."
 
-def _pipeline_invoices():
-    return [
-        {"$sort": {"dateEmission": -1}},
-        {"$limit": 50},
-        {"$addFields": {"clientIdObj": {"$cond": {"if": {"$eq": [{"$type": "$clientId"}, "objectId"]}, "then": "$clientId", "else": {"$toObjectId": "$clientId"}}}}},
-        {"$lookup": {"from": "clients", "localField": "clientIdObj", "foreignField": "_id", "as": "client"}},
-        {"$unwind": {"path": "$client", "preserveNullAndEmptyArrays": True}},
-        {"$project": {
-            "numeroFacture":  1,
-            "dateEmission":   1,
-            "montantTotal":   1,
-            "statutPaiement": 1,
-            "datePaiement":   1,
-            "clientNom":      {"$ifNull": [{"$concat": ["$client.nom", " ", "$client.prenom"]}, "Inconnu"]},
-        }},
-    ]
-
-
-def _pipeline_prospects():
-    return [
-        {"$sort": {"dateCreation": -1}},
-        {"$limit": 50},
-        {"$project": {
-            "nom":       1,
-            "prenom":    1,
-            "email":     1,
-            "telephone": 1,
-            "entreprise":1,
-            "statut":    1,
-        }},
-    ]
-
-
-def _pipeline_interactions():
-    return [
-        {"$sort": {"date": -1}},
-        {"$limit": 50},
-        {"$addFields": {"clientIdObj": {"$cond": {"if": {"$eq": [{"$type": "$clientId"}, "objectId"]}, "then": "$clientId", "else": {"$toObjectId": {"$ifNull": ["$clientId", "000000000000000000000000"]}}}}}},
-        {"$lookup": {"from": "clients", "localField": "clientIdObj", "foreignField": "_id", "as": "client"}},
-        {"$unwind": {"path": "$client", "preserveNullAndEmptyArrays": True}},
-        {"$project": {
-            "type":        1,
-            "description": 1,
-            "date":        1,
-            "clientNom":   {"$ifNull": [{"$concat": ["$client.nom", " ", "$client.prenom"]}, "Inconnu"]},
-        }},
-    ]
-
-
-def _pipeline_employees():
-    return [
-        {"$match": {"actif": True}},
-        {"$project": {
-            "nom":    1,
-            "prenom": 1,
-            "email":  1,
-            "role":   1,
-            "actif":  1,
-        }},
-        {"$limit": 50},
-    ]
-
-
-# ================================================================
-# Fallback formatter
-# ================================================================
-
-def _format_fallback(question: str, data_parts: List[str]) -> str:
-    if not data_parts:
-        return "Je suis là pour vous aider. Posez-moi une question sur vos données CRM/ERP."
-    return f"Voici les données disponibles pour : « {question} »\n\n" + "\n".join(data_parts)
-
-
-# ================================================================
-# Main endpoint
-# ================================================================
 
 @router.post("/assistant/sales_forecast")
 async def sales_forecast(
@@ -322,247 +721,61 @@ async def sales_forecast(
     db=Depends(get_database),
     current_user: dict = Depends(require_roles([ROLE_ADMIN, ROLE_SUPERVISEUR, ROLE_EMPLOYE])),
 ):
-    question = (payload.get("question") or "").strip()
+    del chart
+    del current_user
+
+    question = str(payload.get("question") or "").strip()
     history = payload.get("history") or []
-    language = "en" if str(payload.get("language") or "").lower().startswith("en") else "fr"
+    language = _detect_language(payload.get("language"), question)
 
     if not question:
         raise HTTPException(status_code=400, detail="Question is required")
 
-    instant_replies = {
-        "fr": {
-            "merci": "De rien ! N'hesitez pas si vous avez d'autres questions.",
-            "super": "Ravi de pouvoir vous aider !",
-            "ok": "D'accord ! Autre chose ?",
-            "bien": "Tant mieux ! Je suis la si vous avez d'autres questions.",
-            "parfait": "Parfait ! N'hesitez pas si vous avez d'autres questions.",
-            "au revoir": "Au revoir ! Bonne journee.",
-            "bonne journee": "Merci, bonne journee a vous aussi !",
-            "bonjour": "Bonjour ! Comment puis-je vous aider ?",
-            "bonsoir": "Bonsoir ! Comment puis-je vous aider ?",
-            "salut": "Salut ! Comment puis-je vous aider ?",
-            "stp": "Bien sur, je vous ecoute.",
-            "svp": "Bien sur, je vous ecoute.",
-        },
-        "en": {
-            "thanks": "You're welcome! Let me know if you need anything else.",
-            "thank you": "You're welcome! Let me know if you need anything else.",
-            "great": "Glad I could help!",
-            "ok": "Alright! Anything else?",
-            "perfect": "Perfect! Let me know if you need anything else.",
-            "goodbye": "Goodbye! Have a great day.",
-            "bye": "Goodbye! Have a great day.",
-            "hello": "Hello! How can I help you?",
-            "hi": "Hi! How can I help you?",
-            "please": "Of course, I'm listening.",
-        },
-    }
-
-    system_prompt = (
-        "You are an AI assistant integrated into a professional CRM/ERP. "
-        "You answer only in English, concisely and naturally. "
-        "You use the provided data to answer questions precisely. "
-        "You never invent data. "
-        "You never show technical identifiers such as ObjectId or _id. "
-        "When listing clients, include their full name, email, phone number, and total spent when available. "
-        "When listing invoices, clearly state the payment status. "
-        "If the data is insufficient, say so clearly."
-        if language == "en"
-        else
-        "Tu es un assistant IA integre dans un CRM/ERP professionnel. "
-        "Tu reponds uniquement en francais, de maniere concise et naturelle. "
-        "Tu utilises les donnees fournies pour repondre precisement aux questions. "
-        "Tu n'inventes jamais de donnees. "
-        "Tu ne montres jamais d'identifiants techniques (ObjectId, _id). "
-        "Quand tu listes des clients, tu inclus leur nom complet, email, telephone et montant depense si disponibles. "
-        "Quand tu listes des factures, tu indiques le statut de paiement clairement. "
-        "Si les donnees ne permettent pas de repondre, dis-le clairement."
-    )
-
-    q_lower = question.lower().strip()
-    if q_lower in instant_replies[language]:
+    q_lower = _normalize_text(question)
+    if q_lower in INSTANT_REPLIES[language]:
         return {
-            "answer": instant_replies[language][q_lower],
+            "answer": INSTANT_REPLIES[language][q_lower],
             "chart": None,
             "predictions": [],
             "top_products": [],
             "top_clients": [],
         }
 
-    history_text = " ".join(
-        m.get("content", "")[:200]
-        for m in _strip_charts(history[-6:])
+    history_text = " ".join(str(msg.get("content", ""))[:200] for msg in _strip_charts(history[-6:]))
+    available_collections = await db.list_collection_names()
+    selected_collections = _select_collections(question, history_text, available_collections)
+
+    collection_counts = await _fetch_collection_counts(db, available_collections)
+    collection_samples = await _fetch_collection_samples(db, selected_collections)
+    text_matches = await _find_text_matches(db, selected_collections, question)
+    metrics = await _compute_verified_metrics(db)
+
+    user_message_with_data = _build_data_briefing(
+        question=question,
+        language=language,
+        collection_counts=collection_counts,
+        selected_collections=selected_collections,
+        samples=collection_samples,
+        matches=text_matches,
+        metrics=metrics,
     )
-    intent = _detect_intent(question, history_text)
-    is_general = not any([
-        intent["sales"], intent["products"], intent["clients"],
-        intent["orders"], intent["invoices"], intent["prospects"],
-        intent["interactions"], intent["employees"],
-    ])
 
-    if is_general:
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question},
-        ]
-        answer = await _groq_call(messages)
-        if not answer:
-            answer = (
-                "I'm here to help. Ask me a question about your sales, clients, invoices, products, prospects, or interactions."
-                if language == "en"
-                else
-                "Je suis la pour vous aider. Posez-moi une question sur vos ventes, clients, factures, produits, prospects ou interactions."
-            )
-        return {"answer": answer, "chart": None, "predictions": [], "top_products": [], "top_clients": []}
-
-    tasks = {}
-    if intent["sales"]:
-        tasks["sales"] = db[CommandeModel.collection].aggregate(_pipeline_sales()).to_list(MAX_DOCS)
-    if intent["products"]:
-        tasks["products"] = db[LigneCommandeModel.collection].aggregate(_pipeline_prod()).to_list(5)
-    if intent["clients"]:
-        tasks["clients"] = db[CommandeModel.collection].aggregate(_pipeline_clients()).to_list(10)
-    if intent["orders"]:
-        tasks["orders"] = db[CommandeModel.collection].aggregate(_pipeline_orders()).to_list(50)
-    if intent["invoices"]:
-        tasks["invoices"] = db["factures"].aggregate(_pipeline_invoices()).to_list(50)
-    if intent["prospects"]:
-        tasks["prospects"] = db["prospects"].find({}, {"_id": 0}).to_list(50)
-    if intent["interactions"]:
-        tasks["interactions"] = db["interactions"].aggregate(_pipeline_interactions()).to_list(50)
-    if intent["employees"]:
-        tasks["employees"] = db["users"].aggregate(_pipeline_employees()).to_list(50)
-
-    results = dict(zip(tasks.keys(), await asyncio.gather(*tasks.values())))
-
-    data_parts = []
-    predictions_preview = []
-    top_prod = []
-    top_clients = []
-
-    if results.get("sales"):
-        df_sales = pd.DataFrame([{"month": d["_id"], "total": d["total"]} for d in results["sales"]])
-        forecast_df = forecast_sales(df_sales)
-        predictions_preview = safe_records(forecast_df)
-        data_parts.append(f'{"Sales forecast" if language == "en" else "Previsions de ventes"}: {predictions_preview}')
-
-    if results.get("products"):
-        top_prod = [
-            {
-                "nom": d.get("nom", "Unknown" if language == "en" else "Inconnu"),
-                "description": d.get("description", ""),
-                "prix": d.get("prix", 0),
-                "stock": d.get("stock", 0),
-                "disponible": d.get("disponible", False),
-                "predicted_revenue": round(d.get("predicted_revenue", 0), 2),
-            }
-            for d in results["products"]
-        ]
-        data_parts.append(f'{"Products (name, price, stock, available, revenue)" if language == "en" else "Produits (nom, prix, stock, disponible, revenu)"}: {top_prod}')
-
-    if results.get("clients"):
-        top_clients = [
-            {
-                "nom": f"{d.get('nom', '')} {d.get('prenom', '')}".strip() or ("Unknown" if language == "en" else "Inconnu"),
-                "email": d.get("email", ""),
-                "telephone": d.get("telephone", ""),
-                "adresse": d.get("adresse", ""),
-                "type": d.get("type", ""),
-                "total_spent": round(d.get("total_spent", 0), 2),
-                "nb_commandes": d.get("nb_commandes", 0),
-            }
-            for d in results["clients"]
-        ]
-        data_parts.append(f'{"Clients (name, email, phone, address, type, total_spent, orders)" if language == "en" else "Clients (nom, email, telephone, adresse, type, total_spent, nb_commandes)"}: {top_clients}')
-
-    if results.get("orders"):
-        orders = [
-            {
-                "client": d.get("clientNom", "Unknown" if language == "en" else "Inconnu"),
-                "date": str(d.get("dateCommande", ""))[:10],
-                "statut": d.get("statut", ""),
-                "montant": d.get("montantTotal", 0),
-                "notes": d.get("notes", ""),
-            }
-            for d in results["orders"]
-        ]
-        data_parts.append(f'{"Recent orders (client, date, status, amount)" if language == "en" else "Commandes recentes (client, date, statut, montant)"}: {orders}')
-
-    if results.get("invoices"):
-        invoices = [
-            {
-                "numero": d.get("numeroFacture", ""),
-                "client": d.get("clientNom", "Unknown" if language == "en" else "Inconnu"),
-                "date": str(d.get("dateEmission", ""))[:10],
-                "montant": d.get("montantTotal", 0),
-                "statut": d.get("statutPaiement", ""),
-                "payeLe": str(d.get("datePaiement", ""))[:10] if d.get("datePaiement") else ("Unpaid" if language == "en" else "Non payee"),
-            }
-            for d in results["invoices"]
-        ]
-        data_parts.append(f'{"Invoices (number, client, date, amount, status, paid_on)" if language == "en" else "Factures (numero, client, date, montant, statut, payeLe)"}: {invoices}')
-
-    if results.get("prospects"):
-        prospects = [
-            {
-                "nom": f"{d.get('nom', '')} {d.get('prenom', '')}".strip(),
-                "email": d.get("email", ""),
-                "telephone": d.get("telephone", ""),
-                "entreprise": d.get("entreprise", ""),
-                "statut": d.get("statut", ""),
-            }
-            for d in results["prospects"]
-        ]
-        data_parts.append(f'{"Prospects (name, email, company, status)" if language == "en" else "Prospects (nom, email, entreprise, statut)"}: {prospects}')
-
-    if results.get("interactions"):
-        interactions = [
-            {
-                "type": d.get("type", ""),
-                "client": d.get("clientNom", "Unknown" if language == "en" else "Inconnu"),
-                "date": str(d.get("date", ""))[:10],
-                "description": d.get("description", "")[:200],
-            }
-            for d in results["interactions"]
-        ]
-        data_parts.append(f'{"Recent interactions (type, client, date, description)" if language == "en" else "Interactions recentes (type, client, date, description)"}: {interactions}')
-
-    if results.get("employees"):
-        employees = [
-            {
-                "nom": f"{d.get('nom', '')} {d.get('prenom', '')}".strip(),
-                "email": d.get("email", ""),
-                "role": d.get("role", ""),
-                "actif": d.get("actif", False),
-            }
-            for d in results["employees"]
-        ]
-        data_parts.append(f'{"Employees (name, email, role)" if language == "en" else "Employes (nom, email, role)"}: {employees}')
-
-    user_message_with_data = question
-    if data_parts:
-        user_message_with_data += ("\n\nAvailable data:\n" if language == "en" else "\n\nDonnees disponibles:\n") + "\n".join(data_parts)
-
-    messages = _build_messages(history, system_prompt, user_message_with_data)
-    explanation = await _groq_call(messages)
-
-    if not explanation:
-        if not data_parts:
-            explanation = (
-                "I'm here to help. Ask me a question about your CRM/ERP data."
-                if language == "en"
-                else
-                "Je suis la pour vous aider. Posez-moi une question sur vos donnees CRM/ERP."
-            )
-        else:
-            explanation = (
-                f'Here is the available data for: "{question}"\n\n' if language == "en" else f'Voici les donnees disponibles pour : "{question}"\n\n'
-            ) + "\n".join(data_parts)
+    messages = _build_messages(history, _build_system_prompt(language), user_message_with_data)
+    answer = await _groq_call(messages)
+    if not answer:
+        answer = _fallback_answer(
+            question=question,
+            language=language,
+            collection_counts=collection_counts,
+            selected_collections=selected_collections,
+            matches=text_matches,
+            metrics=metrics,
+        )
 
     return {
-        "answer": explanation,
+        "answer": answer,
         "chart": None,
-        "predictions": predictions_preview,
-        "top_products": top_prod,
-        "top_clients": top_clients,
+        "predictions": metrics.get("sales_forecast", []),
+        "top_products": metrics.get("top_products", []),
+        "top_clients": metrics.get("top_clients", []),
     }
