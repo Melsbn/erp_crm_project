@@ -10,6 +10,107 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
+function LoginOctopusBrand() {
+  return (
+    <div className="flex flex-col items-center">
+      <style>{`
+        .login-geometric-octopus {
+          width: 120px;
+          height: 120px;
+          animation: login-ocean-pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes login-ocean-pulse {
+          0%, 100% {
+            transform: scale(0.96);
+            filter: drop-shadow(0 0 8px rgba(14, 165, 233, 0.4));
+          }
+          50% {
+            transform: scale(1.04);
+            filter: drop-shadow(0 0 20px rgba(14, 165, 233, 0.8));
+          }
+        }
+
+        .login-tentacle-path {
+          stroke-dasharray: 100;
+          stroke-dashoffset: 100;
+          animation: login-draw-tentacles 2.5s ease-in-out infinite alternate;
+        }
+
+        .login-tp-1 { animation-delay: 0s; }
+        .login-tp-2 { animation-delay: 0.2s; }
+        .login-tp-3 { animation-delay: 0.4s; }
+        .login-tp-4 { animation-delay: 0.6s; }
+
+        @keyframes login-draw-tentacles {
+          0% { stroke-dashoffset: 100; opacity: 0.4; }
+          100% { stroke-dashoffset: 0; opacity: 1; }
+        }
+      `}</style>
+
+      <svg
+        className="login-geometric-octopus"
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <path
+          d="M50 15C33.5 15 25 26 25 42C25 50 31 56 42 56H58C69 56 75 50 75 42C75 26 66.5 15 50 15Z"
+          stroke="#38bdf8"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M34 38C34 26 42 22 50 22C58 22 66 26 66 38"
+          stroke="#0284c7"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          opacity="0.7"
+        />
+        <path
+          className="login-tentacle-path login-tp-1"
+          d="M 32,54 C 18,58 10,74 22,86 C 30,92 40,82 36,70 C 34,64 36,56 42,56"
+          stroke="#38bdf8"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          className="login-tentacle-path login-tp-2"
+          d="M 44,56 C 38,68 28,78 38,88 C 44,92 48,84 46,76"
+          stroke="#0284c7"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          className="login-tentacle-path login-tp-3"
+          d="M 56,56 C 62,68 72,78 62,88 C 56,92 52,84 54,76"
+          stroke="#0284c7"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          className="login-tentacle-path login-tp-4"
+          d="M 68,54 C 82,58 90,74 78,86 C 70,92 60,82 64,70 C 66,64 64,56 58,56"
+          stroke="#38bdf8"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+
+      <span className="-mt-1 text-2xl font-bold tracking-tight">
+        <span className="text-slate-600 dark:text-slate-300">Octu</span>
+        <span className="text-sky-500 dark:text-sky-400">plus</span>
+      </span>
+    </div>
+  );
+}
+
 export function LoginPage() {
   const { login } = useAuth();
   const { t } = useTranslation();
@@ -163,6 +264,7 @@ export function LoginPage() {
         </div>
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-4">
+            <LoginOctopusBrand />
             <CardTitle>
               {resetStep === 1 && t('reset.titleStep1')}
               {resetStep === 2 && t('reset.titleStep2')}
@@ -315,8 +417,7 @@ export function LoginPage() {
       </div>
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4">
-          <CardTitle>{t('login.portalTitle')}</CardTitle>
-          <CardDescription>{t('login.portalDescription')}</CardDescription>
+          <LoginOctopusBrand />
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

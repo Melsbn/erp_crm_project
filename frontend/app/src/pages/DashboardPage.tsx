@@ -32,8 +32,38 @@ import {
   UserPlus,
   Activity,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const COLORS = ['#0ea5e9', '#64748b', '#14b8a6', '#f59e0b', '#94a3b8'];
+const CHART_GRID = '#e2e8f0';
+
+interface MetricCardProps {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+  iconClassName: string;
+  compact?: boolean;
+}
+
+function MetricCard({ label, value, icon: Icon, iconClassName, compact = false }: MetricCardProps) {
+  return (
+    <Card className="dashboard-card gap-0 py-0">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+            <p className={compact ? 'mt-1 text-xl font-semibold text-slate-800' : 'mt-2 text-2xl font-semibold text-slate-800'}>
+              {value}
+            </p>
+          </div>
+          <div className={compact ? 'dashboard-icon dashboard-icon-sm' : 'dashboard-icon'}>
+            <Icon className={compact ? `h-4 w-4 ${iconClassName}` : `h-5 w-5 ${iconClassName}`} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
@@ -75,7 +105,7 @@ export function DashboardPage() {
   const ventesParMois = useMemo(() => {
     const mois = locale === 'en-US'
       ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-      : ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'];
+      : ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin'];
 
     return mois.map((m) => ({
       mois: m,
@@ -113,152 +143,99 @@ export function DashboardPage() {
   }, [interactions, locale]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">{t('pages.dashboard.title')}</h1>
-        <p className="text-slate-500">{t('pages.dashboard.welcome', { email: user?.email ?? '' })}</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-800">{t('pages.dashboard.title')}</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          {t('pages.dashboard.welcome', { email: user?.email ?? '' })}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.revenue')}</p>
-                <p className="text-2xl font-bold text-slate-800">
-                  {kpis.totalVentes.toLocaleString(locale)} €
-                </p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
-                <DollarSign className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">{t('navigation.clients')}</p>
-                <p className="text-2xl font-bold text-slate-800">{kpis.totalClients}</p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-                <Users className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.orders')}</p>
-                <p className="text-2xl font-bold text-slate-800">{kpis.totalCommandes}</p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100">
-                <ShoppingCart className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.avgBasket')}</p>
-                <p className="text-2xl font-bold text-slate-800">
-                  {kpis.panierMoyen.toFixed(0)} €
-                </p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-100">
-                <TrendingUp className="h-6 w-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="dashboard-card-grid grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          label={t('pages.dashboard.revenue')}
+          value={`${kpis.totalVentes.toLocaleString(locale)} €`}
+          icon={DollarSign}
+          iconClassName="text-sky-600"
+        />
+        <MetricCard
+          label={t('navigation.clients')}
+          value={kpis.totalClients}
+          icon={Users}
+          iconClassName="text-teal-600"
+        />
+        <MetricCard
+          label={t('pages.dashboard.orders')}
+          value={kpis.totalCommandes}
+          icon={ShoppingCart}
+          iconClassName="text-slate-600"
+        />
+        <MetricCard
+          label={t('pages.dashboard.avgBasket')}
+          value={`${kpis.panierMoyen.toFixed(0)} €`}
+          icon={TrendingUp}
+          iconClassName="text-amber-600"
+        />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-100">
-                <UserPlus className="h-5 w-5 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.prospects')}</p>
-                <p className="text-xl font-bold text-slate-800">{kpis.totalProspects}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
-                <Package className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.ongoingOrders')}</p>
-                <p className="text-xl font-bold text-slate-800">{kpis.commandesEnCours}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
-                <FileText className="h-5 w-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">{t('pages.dashboard.pendingInvoices')}</p>
-                <p className="text-xl font-bold text-slate-800">{kpis.facturesEnAttente}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="dashboard-card-grid grid grid-cols-1 gap-3 md:grid-cols-3">
+        <MetricCard
+          label={t('pages.dashboard.prospects')}
+          value={kpis.totalProspects}
+          icon={UserPlus}
+          iconClassName="text-amber-600"
+          compact
+        />
+        <MetricCard
+          label={t('pages.dashboard.ongoingOrders')}
+          value={kpis.commandesEnCours}
+          icon={Package}
+          iconClassName="text-sky-600"
+          compact
+        />
+        <MetricCard
+          label={t('pages.dashboard.pendingInvoices')}
+          value={kpis.facturesEnAttente}
+          icon={FileText}
+          iconClassName="text-rose-600"
+          compact
+        />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('pages.dashboard.monthlySales')}</CardTitle>
+      <div className="dashboard-card-grid grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="dashboard-card gap-0 py-0">
+          <CardHeader className="px-5 py-4">
+            <CardTitle className="text-base font-semibold">{t('pages.dashboard.monthlySales')}</CardTitle>
             <CardDescription>{t('pages.dashboard.salesTrend')}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
+          <CardContent className="px-5 pb-5">
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={ventesParMois}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="mois" />
-                <YAxis />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
+                <XAxis dataKey="mois" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
                 <Tooltip formatter={(value: number) => `${value.toLocaleString(locale)} €`} />
-                <Bar dataKey="montant" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="montant" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('pages.dashboard.ordersByStatus')}</CardTitle>
+        <Card className="dashboard-card gap-0 py-0">
+          <CardHeader className="px-5 py-4">
+            <CardTitle className="text-base font-semibold">{t('pages.dashboard.ordersByStatus')}</CardTitle>
             <CardDescription>{t('pages.dashboard.orderBreakdown')}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
+          <CardContent className="px-5 pb-5">
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
                   data={commandesParStatut}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
+                  outerRadius={78}
+                  paddingAngle={4}
                   dataKey="value"
                 >
                   {commandesParStatut.map((_, index) => (
@@ -268,14 +245,14 @@ export function DashboardPage() {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-            <div className="mt-4 flex flex-wrap justify-center gap-4">
+            <div className="mt-3 flex flex-wrap justify-center gap-3">
               {commandesParStatut.map((item, index) => (
                 <div key={item.name} className="flex items-center gap-2">
                   <div
-                    className="h-3 w-3 rounded-full"
+                    className="h-2.5 w-2.5 rounded-full"
                     style={{ backgroundColor: COLORS[index % COLORS.length] }}
                   />
-                  <span className="text-sm text-slate-600">{t(`statusLabels.order.${item.name}`)}</span>
+                  <span className="text-xs text-slate-600">{t(`statusLabels.order.${item.name}`)}</span>
                 </div>
               ))}
             </div>
@@ -283,36 +260,36 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('pages.dashboard.popularProducts')}</CardTitle>
+      <div className="dashboard-card-grid grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="dashboard-card gap-0 py-0">
+          <CardHeader className="px-5 py-4">
+            <CardTitle className="text-base font-semibold">{t('pages.dashboard.popularProducts')}</CardTitle>
             <CardDescription>{t('pages.dashboard.topProducts')}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
+          <CardContent className="px-5 pb-5">
+            <ResponsiveContainer width="100%" height={190}>
               <BarChart data={topProduits} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={120} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} horizontal={false} />
+                <XAxis type="number" tickLine={false} axisLine={false} />
+                <YAxis dataKey="name" type="category" width={120} tickLine={false} axisLine={false} />
                 <Tooltip />
-                <Bar dataKey="ventes" fill="#10b981" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="ventes" fill="#14b8a6" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('pages.dashboard.recentActivity')}</CardTitle>
+        <Card className="dashboard-card gap-0 py-0">
+          <CardHeader className="px-5 py-4">
+            <CardTitle className="text-base font-semibold">{t('pages.dashboard.recentActivity')}</CardTitle>
             <CardDescription>{t('pages.dashboard.latestInteractions')}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="px-5 pb-5">
+            <div className="space-y-3">
               {recentActivity.map((activity) => (
                 <div key={activity.id} className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100">
-                    <Activity className="h-4 w-4 text-blue-600" />
+                  <div className="dashboard-icon dashboard-icon-xs flex-shrink-0">
+                    <Activity className="h-3.5 w-3.5 text-sky-600" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-800">

@@ -1,4 +1,5 @@
 import smtplib
+from html import escape
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from app.core.config import settings
@@ -97,4 +98,59 @@ async def send_invoice_reminder_email(
         return True
     except Exception as e:
         print(f"Error sending invoice reminder email: {e}")
+        return False
+
+
+async def send_new_user_credentials_email(
+    to_email: str,
+    user_name: str,
+    temporary_password: str,
+):
+    """Send initial login credentials to a newly created user."""
+    try:
+        safe_user_name = escape(user_name)
+        safe_temporary_password = escape(temporary_password)
+
+        msg = MIMEMultipart()
+        msg["From"] = settings.FROM_EMAIL
+        msg["To"] = to_email
+        msg["Subject"] = "Your CRM account has been created"
+
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <h2 style="color: #1f2937; text-align: center;">Welcome to CRM ERP</h2>
+                <p style="color: #374151; font-size: 15px;">Hello {safe_user_name},</p>
+                <p style="color: #4b5563; font-size: 15px;">
+                    Your account has been created. You can sign in using the email address that received this message.
+                </p>
+
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 16px; border-radius: 8px; margin: 18px 0;">
+                    <p style="margin: 0 0 8px 0; color: #1e3a8a; font-size: 14px;">Temporary password</p>
+                    <h3 style="margin: 0; color: #1d4ed8; font-size: 24px; letter-spacing: 1px;">{safe_temporary_password}</h3>
+                </div>
+
+                <p style="color: #4b5563; font-size: 14px;">
+                    For security, please reset your password after your first login.
+                </p>
+                <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
+                    This is an automatic message. If you were not expecting this account, contact your supervisor.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+
+        msg.attach(MIMEText(body, "html"))
+
+        server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT)
+        server.starttls()
+        server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+
+        return True
+    except Exception as e:
+        print(f"Error sending new user credentials email: {e}")
         return False

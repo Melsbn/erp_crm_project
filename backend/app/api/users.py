@@ -14,7 +14,8 @@ from app.api.deps import (
     is_primary_supervisor,
     ensure_supervisor_can_manage_privileged_roles,
 )
-from app.core.security import get_password_hash
+from app.core.email_service import send_new_user_credentials_email
+from app.core.security import generate_temporary_password, get_password_hash
 
 router = APIRouter()
 
@@ -98,18 +99,30 @@ async def create_user(
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    temporary_password = generate_temporary_password()
     user_dict = user.model_dump(exclude={"password"})
     user_dict["email"] = normalized_email
     if user.role.value == ROLE_SUPERVISEUR:
         user_dict[PRIMARY_SUPERVISOR_FIELD] = True
 
-    # HASH PASSWORD
-    user_dict["hashed_password"] = get_password_hash(user.password)
+    user_dict["hashed_password"] = get_password_hash(temporary_password)
 
     user_dict.update(BaseModel.get_base_fields())
 
     result = await db[UserModel.collection].insert_one(user_dict)
     created_user = await db[UserModel.collection].find_one({"_id": result.inserted_id})
+
+    email_sent = await send_new_user_credentials_email(
+        normalized_email,
+        f"{user.prenom} {user.nom}".strip(),
+        temporary_password,
+    )
+    if not email_sent:
+        await db[UserModel.collection].delete_one({"_id": result.inserted_id})
+        raise HTTPException(
+            status_code=500,
+            detail="User was not created because the credentials email could not be sent",
+        )
 
     return serialize_doc(created_user)
 

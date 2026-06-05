@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+import secrets
+import string
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -59,3 +61,17 @@ def generate_reset_code() -> str:
     """Generate a 6-digit reset code for password reset."""
     import random
     return str(random.randint(100000, 999999))
+
+
+def generate_temporary_password(length: int = 14) -> str:
+    """Generate a secure temporary password for a new user."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%&*?"
+    while True:
+        password = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (
+            any(char.islower() for char in password)
+            and any(char.isupper() for char in password)
+            and any(char.isdigit() for char in password)
+            and any(char in "!@#$%&*?" for char in password)
+        ):
+            return password
