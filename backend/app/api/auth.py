@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
+from bson import ObjectId
 from app.core.security import (
     verify_password,
     create_access_token,
@@ -45,10 +46,71 @@ class PasswordResetConfirm(BaseModel):
     new_password: str
 
 
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 # ---------------- HELPERS ----------------
 
 def normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+def serialize_current_user(user: dict) -> dict:
+    return {
+        "email": user["email"],
+        "role": user["role"],
+        "id": str(user["_id"]),
+        "nom": user.get("nom", ""),
+        "prenom": user.get("prenom", ""),
+        "actif": user.get("actif", True),
+        "dateCreation": user.get("dateCreation").isoformat() if user.get("dateCreation") else "",
+    }
+
+
+async def get_authenticated_user(
+    credentials: HTTPAuthorizationCredentials,
+    db,
+) -> dict:
+    payload = decode_token(credentials.credentials)
+
+    if not payload:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication credentials",
+        )
+
+    if payload.get("role") not in ALLOWED_ROLES:
+        raise HTTPException(
+            status_code=403,
+            detail="Insufficient privileges",
+        )
+
+    query = {"email": payload["sub"]}
+    if ObjectId.is_valid(payload.get("id", "")):
+        query = {"_id": ObjectId(payload["id"])}
+
+    user = await db.users.find_one(query)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication credentials",
+        )
+
+    if not is_user_active(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Account is deactivated",
+        )
+
+    if not can_use_supervisor_role(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the primary supervisor account can use the supervisor role",
+        )
+
+    return user
 
 
 # ---------------- LOGIN ----------------
@@ -230,42 +292,38 @@ async def get_current_user_info(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db=Depends(get_database),
 ):
+    user = await get_authenticated_user(credentials, db)
+    return serialize_current_user(user)
 
-    payload = decode_token(credentials.credentials)
 
-    if not payload:
+@router.post("/change-password")
+async def change_password(
+    request: PasswordChangeRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db=Depends(get_database),
+):
+    user = await get_authenticated_user(credentials, db)
+
+    if not verify_password(request.current_password, user["hashed_password"]):
         raise HTTPException(
-            status_code=401,
-            detail="Invalid authentication credentials",
+            status_code=400,
+            detail="Current password is incorrect",
         )
 
-    if payload.get("role") not in ALLOWED_ROLES:
+    if len(request.new_password) < 6:
         raise HTTPException(
-            status_code=403,
-            detail="Insufficient privileges",
+            status_code=400,
+            detail="New password must be at least 6 characters",
         )
 
-    user = await db.users.find_one({"email": payload["sub"]})
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid authentication credentials",
-        )
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {
+                "hashed_password": get_password_hash(request.new_password),
+                "updated_at": datetime.utcnow(),
+            }
+        },
+    )
 
-    if not is_user_active(user):
-        raise HTTPException(
-            status_code=403,
-            detail="Account is deactivated",
-        )
-
-    if not can_use_supervisor_role(user):
-        raise HTTPException(
-            status_code=403,
-            detail="Only the primary supervisor account can use the supervisor role",
-        )
-
-    return {
-        "email": payload["sub"],
-        "role": payload["role"],
-        "id": payload["id"],
-    }
+    return {"message": "Password changed successfully"}

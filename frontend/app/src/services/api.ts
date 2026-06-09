@@ -16,6 +16,16 @@ import type {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
+export interface ProfileUser {
+  id: string;
+  nom: string;
+  prenom: string;
+  email: string;
+  role: string;
+  actif: boolean;
+  dateCreation: string;
+}
+
 class ApiService {
   private baseUrl: string;
 
@@ -76,6 +86,21 @@ class ApiService {
     }
 
     return response.json();
+  }
+
+  // Profile
+  async getProfile(): Promise<ProfileUser> {
+    return this.request<ProfileUser>('/auth/me');
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
   }
 
   // Users
