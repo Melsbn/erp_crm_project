@@ -60,6 +60,7 @@ function BrandMark() {
 
 function ProfileDialog() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<ProfileUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -78,14 +79,14 @@ function ProfileDialog() {
       try {
         setProfile(await api.getProfile());
       } catch {
-        toast.error('Failed to load profile');
+        toast.error(t('layout.profile.loadError'));
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchProfile();
-  }, [open]);
+  }, [open, t]);
 
   const resetPasswordForm = () => {
     setPasswordForm({
@@ -97,7 +98,7 @@ function ProfileDialog() {
 
   const handleChangePassword = async () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error('New passwords do not match');
+      toast.error(t('layout.profile.passwordMismatch'));
       return;
     }
 
@@ -105,15 +106,16 @@ function ProfileDialog() {
     try {
       await api.changePassword(passwordForm.currentPassword, passwordForm.newPassword);
       resetPasswordForm();
-      toast.success('Password changed successfully');
+      toast.success(t('layout.profile.changeSuccess'));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to change password');
+      toast.error(error instanceof Error ? error.message : t('layout.profile.changeError'));
     } finally {
       setIsSaving(false);
     }
   };
 
-  const displayName = [profile?.prenom, profile?.nom].filter(Boolean).join(' ') || 'User profile';
+  const displayName = [profile?.prenom, profile?.nom].filter(Boolean).join(' ') || t('layout.profile.userProfile');
+  const role = profile?.role ?? user?.role;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -122,15 +124,15 @@ function ProfileDialog() {
           variant="ghost"
           size="icon"
           className="rounded-full"
-          aria-label="Open profile"
+          aria-label={t('layout.profile.open')}
         >
           <UserCircle className="h-5 w-5" />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>My profile</DialogTitle>
-          <DialogDescription>View your account details and update your password.</DialogDescription>
+          <DialogTitle>{t('layout.profile.title')}</DialogTitle>
+          <DialogDescription>{t('layout.profile.description')}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -141,7 +143,7 @@ function ProfileDialog() {
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {isLoading ? 'Loading...' : displayName}
+                  {isLoading ? t('layout.profile.loading') : displayName}
                 </p>
                 <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                   {profile?.email ?? user?.email}
@@ -150,15 +152,15 @@ function ProfileDialog() {
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Role</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t('common.role')}</p>
                 <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                  {profile?.role ?? user?.role}
+                  {role ? t(`statusLabels.role.${role}`, role) : '-'}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Status</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t('common.status')}</p>
                 <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                  {profile?.actif === false ? 'Inactive' : 'Active'}
+                  {profile?.actif === false ? t('common.inactive') : t('common.active')}
                 </p>
               </div>
             </div>
@@ -167,10 +169,10 @@ function ProfileDialog() {
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
               <KeyRound className="h-4 w-4" />
-              Change password
+              {t('layout.profile.changePassword')}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="profile-current-password">Current password</Label>
+              <Label htmlFor="profile-current-password">{t('layout.profile.currentPassword')}</Label>
               <Input
                 id="profile-current-password"
                 type="password"
@@ -182,7 +184,7 @@ function ProfileDialog() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="profile-new-password">New password</Label>
+                <Label htmlFor="profile-new-password">{t('layout.profile.newPassword')}</Label>
                 <Input
                   id="profile-new-password"
                   type="password"
@@ -193,7 +195,7 @@ function ProfileDialog() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="profile-confirm-password">Confirm password</Label>
+                <Label htmlFor="profile-confirm-password">{t('layout.profile.confirmPassword')}</Label>
                 <Input
                   id="profile-confirm-password"
                   type="password"
@@ -209,7 +211,7 @@ function ProfileDialog() {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            Close
+            {t('layout.profile.close')}
           </Button>
           <Button
             onClick={handleChangePassword}
@@ -221,7 +223,7 @@ function ProfileDialog() {
             }
             className="bg-blue-600 hover:bg-blue-700"
           >
-            {isSaving ? 'Saving...' : 'Save password'}
+            {isSaving ? t('layout.profile.saving') : t('layout.profile.savePassword')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -400,7 +402,7 @@ export function Layout() {
               {activeNavigationItem?.name ?? 'octuplus'}
             </p>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Signed in as {user?.email}
+              {t('layout.signedInAs', { email: user?.email })}
             </p>
           </div>
           <div className="flex items-center gap-2">
