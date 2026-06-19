@@ -329,14 +329,6 @@ export function Layout() {
               </Link>
             ))}
             <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
-              <div className="mb-2 rounded-xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
-                <div className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {user?.email}
-                </div>
-                <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
-                  {user?.role}
-                </div>
-              </div>
               <Button
                 variant="ghost"
                 className="w-full justify-start rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
@@ -374,14 +366,6 @@ export function Layout() {
             ))}
           </nav>
           <div className="border-t border-slate-200 p-4 dark:border-slate-800">
-            <div className="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
-              <div className="truncate text-xs text-slate-500 dark:text-slate-400">
-                {user?.email}
-              </div>
-              <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
-                {user?.role}
-              </div>
-            </div>
             <Button
               variant="ghost"
               className="w-full justify-start rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"

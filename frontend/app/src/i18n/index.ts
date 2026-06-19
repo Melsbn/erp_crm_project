@@ -188,7 +188,7 @@ const resources = {
       pages: {
         dashboard: {
           title: 'Tableau de bord',
-          welcome: 'Bienvenue, {{email}}',
+          welcome: 'Bienvenue, {{name}}',
           revenue: "Chiffre d'affaires",
           orders: 'Commandes',
           avgBasket: 'Panier moyen',
@@ -702,7 +702,7 @@ const resources = {
       pages: {
         dashboard: {
           title: 'Dashboard',
-          welcome: 'Welcome, {{email}}',
+          welcome: 'Welcome, {{name}}',
           revenue: 'Revenue',
           orders: 'Orders',
           avgBasket: 'Average basket',

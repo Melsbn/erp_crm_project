@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Edit2, Trash2, UserPlus, ArrowRight, Star, Phone, Mail, UserCheck } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, UserPlus, ArrowRight, Star, Phone, UserCheck, UserX } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
@@ -312,7 +312,7 @@ export function ProspectsPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <Mail className="w-5 h-5 text-red-600" />
+                <UserX className="w-5 h-5 text-red-600" />
               </div>
               <div>
                 <p className="text-sm text-slate-500">{t('pages.prospects.statsLost')}</p>
@@ -525,4 +525,3 @@ export function ProspectsPage() {
     </div>
   );
 }
-

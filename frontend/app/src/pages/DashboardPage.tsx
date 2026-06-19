@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/services/api';
+import type { ProfileUser } from '@/services/api';
 import { StatutCommande, StatutPaiement } from '@/types';
 import {
   Card,
@@ -37,6 +39,19 @@ import type { LucideIcon } from 'lucide-react';
 const COLORS = ['#0ea5e9', '#64748b', '#14b8a6', '#f59e0b', '#94a3b8'];
 const CHART_GRID = '#e2e8f0';
 
+type UserWithName = {
+  nom?: string;
+  prenom?: string;
+};
+
+function stableMetric(seed: string, min: number, range: number) {
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) % 100000;
+  }
+  return min + (hash % range);
+}
+
 interface MetricCardProps {
   label: string;
   value: string | number;
@@ -68,6 +83,10 @@ function MetricCard({ label, value, icon: Icon, iconClassName, compact = false }
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const namedUser = user as (typeof user & UserWithName);
+  const userFirstName = namedUser?.prenom;
+  const userLastName = namedUser?.nom;
+  const [profile, setProfile] = useState<ProfileUser | null>(null);
   const {
     clients,
     prospects,
@@ -78,6 +97,23 @@ export function DashboardPage() {
   } = useStore();
 
   const locale = i18n.resolvedLanguage === 'en' ? 'en-US' : 'fr-FR';
+  const userDisplayName = [userFirstName ?? profile?.prenom, userLastName ?? profile?.nom]
+    .filter(Boolean)
+    .join(' ') || user?.email || '';
+
+  useEffect(() => {
+    if (!user || userFirstName || userLastName) return;
+
+    const fetchProfile = async () => {
+      try {
+        setProfile(await api.getProfile());
+      } catch {
+        setProfile(null);
+      }
+    };
+
+    fetchProfile();
+  }, [user, userFirstName, userLastName]);
 
   const kpis = useMemo(() => {
     const totalVentes = commandes.reduce((sum, c) => sum + c.montantTotal, 0);
@@ -109,8 +145,8 @@ export function DashboardPage() {
 
     return mois.map((m) => ({
       mois: m,
-      montant: Math.floor(Math.random() * 10000) + 5000,
-      commandes: Math.floor(Math.random() * 20) + 5,
+      montant: stableMetric(m, 5000, 10000),
+      commandes: stableMetric(`${m}-orders`, 5, 20),
     }));
   }, [locale]);
 
@@ -125,8 +161,8 @@ export function DashboardPage() {
   const topProduits = useMemo(() => {
     return produits.slice(0, 5).map((p) => ({
       name: p.nom,
-      ventes: Math.floor(Math.random() * 50) + 10,
-      revenu: p.prix * (Math.floor(Math.random() * 50) + 10),
+      ventes: stableMetric(p.id || p.nom, 10, 50),
+      revenu: p.prix * stableMetric(`${p.id || p.nom}-revenue`, 10, 50),
     }));
   }, [produits]);
 
@@ -147,7 +183,7 @@ export function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-800">{t('pages.dashboard.title')}</h1>
         <p className="mt-1 text-sm text-slate-500">
-          {t('pages.dashboard.welcome', { email: user?.email ?? '' })}
+          {t('pages.dashboard.welcome', { name: userDisplayName })}
         </p>
       </div>
 
