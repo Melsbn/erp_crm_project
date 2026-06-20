@@ -104,7 +104,7 @@ function LoginOctopusBrand() {
       </svg>
 
       <span className="-mt-1 text-2xl font-bold tracking-tight">
-        <span className="text-slate-600 dark:text-slate-300">Octu</span>
+        <span className="text-slate-600 dark:text-slate-300">Octo</span>
         <span className="text-sky-500 dark:text-sky-400">plus</span>
       </span>
     </div>

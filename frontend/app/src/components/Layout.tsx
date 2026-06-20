@@ -46,12 +46,12 @@ function BrandMark() {
       <div className="flex h-9 w-9 items-center justify-center overflow-hidden">
         <img
           src="/octopus-logo.png"
-          alt="octuplus logo"
+          alt="octoplus logo"
           className="h-8 w-8 object-contain"
         />
       </div>
       <span className="text-base font-bold tracking-tight">
-        <span className="text-slate-600 dark:text-slate-300">Octu</span>
+        <span className="text-slate-600 dark:text-slate-300">Octo</span>
         <span className="text-sky-500 dark:text-sky-400">plus</span>
       </span>
     </div>
@@ -383,7 +383,7 @@ export function Layout() {
         <div className="hidden h-20 items-center justify-between border-b border-slate-200 bg-white/78 px-8 backdrop-blur dark:border-slate-800 dark:bg-slate-950/78 lg:flex">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
-              {activeNavigationItem?.name ?? 'octuplus'}
+              {activeNavigationItem?.name ?? 'octoplus'}
             </p>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {t('layout.signedInAs', { email: user?.email })}
