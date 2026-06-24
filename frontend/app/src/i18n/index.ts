@@ -382,6 +382,7 @@ const resources = {
           paymentMethod: 'M\u00e9thode de paiement',
           reference: 'R\u00e9f\u00e9rence',
           transactionNumber: 'Num\u00e9ro de transaction...',
+          referenceRequired: 'La r\u00e9f\u00e9rence du virement est obligatoire',
           downloadSuccess: 'Facture PDF t\u00e9l\u00e9charg\u00e9e',
           downloadError: '\u00c9chec du t\u00e9l\u00e9chargement',
           paymentSuccess: 'Paiement enregistr\u00e9 avec succ\u00e8s',
@@ -396,6 +397,16 @@ const resources = {
             card: 'Carte bancaire',
             transfer: 'Virement',
             cash: 'Esp\u00e8ces',
+          },
+          referenceFields: {
+            transfer: {
+              label: 'R\u00e9f\u00e9rence du virement bancaire',
+              placeholder: 'R\u00e9f\u00e9rence bancaire...',
+            },
+            card: {
+              label: 'Identifiant de transaction carte',
+              placeholder: 'Identifiant de transaction (facultatif)...',
+            },
           },
           pdf: {
             companyName: 'VOTRE ENTREPRISE',
@@ -896,6 +907,7 @@ const resources = {
           paymentMethod: 'Payment method',
           reference: 'Reference',
           transactionNumber: 'Transaction number...',
+          referenceRequired: 'Bank transfer reference is required',
           downloadSuccess: 'Invoice PDF downloaded',
           downloadError: 'Download failed',
           paymentSuccess: 'Payment recorded successfully',
@@ -910,6 +922,16 @@ const resources = {
             card: 'Credit card',
             transfer: 'Bank transfer',
             cash: 'Cash',
+          },
+          referenceFields: {
+            transfer: {
+              label: 'Bank transfer reference',
+              placeholder: 'Bank reference...',
+            },
+            card: {
+              label: 'Card transaction ID',
+              placeholder: 'Transaction ID (optional)...',
+            },
           },
           pdf: {
             companyName: 'YOUR COMPANY',

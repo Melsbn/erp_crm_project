@@ -447,6 +447,39 @@ export function FacturesPage() {
     }
   };
 
+  const getPaymentReferenceConfig = (method: MethodePaiement) => {
+    switch (method) {
+      case MethodePaiement.VIREMENT:
+        return {
+          isVisible: true,
+          isRequired: true,
+          label: t('pages.invoices.referenceFields.transfer.label'),
+          placeholder: t('pages.invoices.referenceFields.transfer.placeholder'),
+        };
+      case MethodePaiement.CARTE:
+        return {
+          isVisible: true,
+          isRequired: false,
+          label: t('pages.invoices.referenceFields.card.label'),
+          placeholder: t('pages.invoices.referenceFields.card.placeholder'),
+        };
+      case MethodePaiement.ESPECES:
+        return {
+          isVisible: false,
+          isRequired: false,
+          label: '',
+          placeholder: '',
+        };
+      default:
+        return {
+          isVisible: true,
+          isRequired: false,
+          label: t('pages.invoices.reference'),
+          placeholder: t('pages.invoices.transactionNumber'),
+        };
+    }
+  };
+
   const filteredFactures = factures.filter(
     (facture) =>
       facture.numeroFacture.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -480,6 +513,12 @@ export function FacturesPage() {
 
   const handleAddPaiement = async () => {
     if (!selectedFacture) return;
+    const referenceConfig = getPaymentReferenceConfig(paiementForm.methode);
+    const reference = referenceConfig.isVisible ? paiementForm.reference.trim() : '';
+    if (referenceConfig.isRequired && !reference) {
+      toast.error(t('pages.invoices.referenceRequired'));
+      return;
+    }
     const montantPaye = getMontantPaye(selectedFacture.id) + paiementForm.montant;
     const montantTotal = selectedFacture.montantTotal;
     let newStatut: StatutPaiement;
@@ -489,6 +528,7 @@ export function FacturesPage() {
     try {
       await addPaiement({
         ...paiementForm,
+        reference,
         datePaiement: new Date().toISOString(),
         factureId: selectedFacture.id,
       });
@@ -589,6 +629,8 @@ export function FacturesPage() {
     montantTotal: factures.reduce((sum, f) => sum + f.montantTotal, 0),
     montantPaye: paiements.reduce((sum, p) => sum + p.montant, 0),
   };
+
+  const referenceConfig = getPaymentReferenceConfig(paiementForm.methode);
 
   return (
     <div className="space-y-6">
@@ -852,7 +894,7 @@ export function FacturesPage() {
                             {new Date(paiement.datePaiement).toLocaleDateString(locale)}
                           </TableCell>
                           <TableCell>{getPaymentMethodLabel(paiement.methode)}</TableCell>
-                          <TableCell>{paiement.reference}</TableCell>
+                          <TableCell>{paiement.reference || '—'}</TableCell>
                           <TableCell className="text-right">
                             {paiement.montant.toLocaleString(locale)} €
                           </TableCell>
@@ -921,7 +963,14 @@ export function FacturesPage() {
               <Label htmlFor="methode">{t('pages.invoices.paymentMethod')}</Label>
               <Select
                 value={paiementForm.methode}
-                onValueChange={(value) => setPaiementForm({ ...paiementForm, methode: value as MethodePaiement })}
+                onValueChange={(value) => {
+                  const methode = value as MethodePaiement;
+                  setPaiementForm({
+                    ...paiementForm,
+                    methode,
+                    reference: methode === MethodePaiement.ESPECES ? '' : paiementForm.reference,
+                  });
+                }}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -931,15 +980,21 @@ export function FacturesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="reference">{t('pages.invoices.reference')}</Label>
-              <Input
-                id="reference"
-                value={paiementForm.reference}
-                onChange={(e) => setPaiementForm({ ...paiementForm, reference: e.target.value })}
-                placeholder={t('pages.invoices.transactionNumber')}
-              />
-            </div>
+            {referenceConfig.isVisible && (
+              <div className="space-y-2">
+                <Label htmlFor="reference">
+                  {referenceConfig.label}
+                  {referenceConfig.isRequired && <span className="text-red-600"> *</span>}
+                </Label>
+                <Input
+                  id="reference"
+                  value={paiementForm.reference}
+                  onChange={(e) => setPaiementForm({ ...paiementForm, reference: e.target.value })}
+                  placeholder={referenceConfig.placeholder}
+                  required={referenceConfig.isRequired}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsPaiementDialogOpen(false)}>{t('common.cancel')}</Button>

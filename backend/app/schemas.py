@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -316,8 +316,17 @@ class PaiementBase(BaseModel):
     montant: float
     methode: MethodePaiement
     datePaiement: str
-    reference: str
+    reference: str = ""
     factureId: str
+
+    @model_validator(mode="after")
+    def validate_reference_for_method(self):
+        self.reference = self.reference.strip()
+        if self.methode == MethodePaiement.VIREMENT and not self.reference:
+            raise ValueError("Bank transfer reference is required")
+        if self.methode == MethodePaiement.ESPECES:
+            self.reference = ""
+        return self
 
 
 class PaiementCreate(PaiementBase):
