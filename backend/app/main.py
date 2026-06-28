@@ -1,6 +1,8 @@
+import asyncio
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection, get_database
 from app.api import auth, users, clients, prospects, products, orders, invoices, misc, dashboard, assistant
@@ -10,6 +12,7 @@ from app.api.deps import (
     PRIMARY_SUPERVISOR_FIELD,
     SUPERVISOR_EMAIL,
 )
+from app.services.invoice_reminders import automatic_invoice_reminder_loop
 
 
 async def enforce_primary_supervisor_identity() -> None:
@@ -66,7 +69,13 @@ async def lifespan(app: FastAPI):
     # Startup
     await connect_to_mongo()
     await enforce_primary_supervisor_identity()
-    yield
+    reminder_task = asyncio.create_task(automatic_invoice_reminder_loop(get_database()))
+    try:
+        yield
+    finally:
+        reminder_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await reminder_task
     # Shutdown
     await close_mongo_connection()
 

@@ -1,6 +1,6 @@
-﻿import { useState, useRef } from 'react';
+﻿import { useMemo, useState, useRef } from 'react';
 import { useStore } from '@/store';
-import { TypeRapport } from '@/types';
+import { StatutCommande, TypeRapport, UserRole } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,6 +51,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const SALES_STATUSES = new Set<StatutCommande>([StatutCommande.CONFIRMEE, StatutCommande.LIVREE]);
 
 const typeIcons = {
   [TypeRapport.VENTES]: TrendingUp,
@@ -71,7 +72,7 @@ async function captureElement(el: HTMLElement): Promise<string> {
 
 export function RapportsPage() {
   const { t, i18n } = useTranslation();
-  const { rapports, commandes, clients, produits, users, addRapport } = useStore();
+  const { rapports, commandes, clients, produits, users, lignesCommande, addRapport } = useStore();
   const locale = i18n.language.startsWith('fr') ? 'fr-FR' : 'en-US';
   const reportTypeLabel = (type: TypeRapport) => t(`statusLabels.reportType.${type}`);
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,32 +101,84 @@ export function RapportsPage() {
 
   // ── Chart data ─────────────────────────────────────────────────────────────
 
-  const ventesData = [
-    { mois: t('pages.reports.months.jan'), montant: 15000, commandes: 12 },
-    { mois: t('pages.reports.months.feb'), montant: 18000, commandes: 15 },
-    { mois: t('pages.reports.months.mar'), montant: 22000, commandes: 18 },
-    { mois: t('pages.reports.months.apr'), montant: 19000, commandes: 16 },
-    { mois: t('pages.reports.months.may'), montant: 25000, commandes: 22 },
-    { mois: t('pages.reports.months.jun'), montant: 28000, commandes: 25 },
-  ];
+  const ventesData = useMemo(() => {
+    const monthLabels = [
+      t('pages.reports.months.jan'),
+      t('pages.reports.months.feb'),
+      t('pages.reports.months.mar'),
+      t('pages.reports.months.apr'),
+      t('pages.reports.months.may'),
+      t('pages.reports.months.jun'),
+      t('pages.reports.months.jul'),
+      t('pages.reports.months.aug'),
+      t('pages.reports.months.sep'),
+      t('pages.reports.months.oct'),
+      t('pages.reports.months.nov'),
+      t('pages.reports.months.dec'),
+    ];
+    const currentYear = new Date().getFullYear();
+    const months = monthLabels.map((mois) => ({ mois, montant: 0, commandes: 0 }));
+
+    commandes
+      .filter((commande) => SALES_STATUSES.has(commande.statut))
+      .forEach((commande) => {
+        const date = new Date(commande.dateCommande);
+        if (date.getFullYear() !== currentYear) return;
+
+        const bucket = months[date.getMonth()];
+        bucket.montant += commande.montantTotal;
+        bucket.commandes += 1;
+      });
+
+    return months;
+  }, [commandes, t]);
 
   const clientTypeData = [
     { name: t('pages.reports.individuals'), value: clients.filter((c) => c.type === 'PARTICULIER').length },
     { name: t('pages.reports.businesses'),  value: clients.filter((c) => c.type === 'ENTREPRISE').length },
   ];
 
-  const produitData = produits.slice(0, 5).map((p) => ({
-    name: p.nom,
-    ventes: Math.floor(Math.random() * 50) + 10,
-  }));
+  const produitData = useMemo(() => {
+    const salesOrderIds = new Set(
+      commandes
+        .filter((commande) => SALES_STATUSES.has(commande.statut))
+        .map((commande) => commande.id)
+    );
+    const productNames = new Map(produits.map((produit) => [produit.id, produit.nom]));
+    const totals = new Map<string, { name: string; ventes: number }>();
 
-  const performanceData = users
-    .filter((u) => u.role !== 'ADMIN')
-    .map((u) => ({
-      name: `${u.prenom} ${u.nom}`,
-      ventes: Math.floor(Math.random() * 20) + 5,
-      montant: Math.floor(Math.random() * 50000) + 10000,
-    }));
+    lignesCommande
+      .filter((ligne) => salesOrderIds.has(ligne.commandeId))
+      .forEach((ligne) => {
+        const current = totals.get(ligne.produitId) ?? {
+          name: productNames.get(ligne.produitId) ?? ligne.produitId,
+          ventes: 0,
+        };
+        current.ventes += ligne.quantite;
+        totals.set(ligne.produitId, current);
+      });
+
+    return Array.from(totals.values())
+      .sort((a, b) => b.ventes - a.ventes)
+      .slice(0, 5);
+  }, [commandes, lignesCommande, produits]);
+
+  const performanceData = useMemo(() => {
+    return users
+      .filter((u) => u.role === UserRole.EMPLOYE)
+      .map((u) => {
+        const employeeOrders = commandes.filter(
+          (commande) => commande.userId === u.id && SALES_STATUSES.has(commande.statut)
+        );
+        return {
+          name: `${u.prenom} ${u.nom}`.trim() || u.email,
+          ventes: employeeOrders.length,
+          montant: employeeOrders.reduce((sum, commande) => sum + commande.montantTotal, 0),
+        };
+      })
+      .filter((employee) => employee.ventes > 0 || employee.montant > 0)
+      .sort((a, b) => b.montant - a.montant);
+  }, [commandes, users]);
 
   // ─── PDF generation ────────────────────────────────────────────────────────
 
@@ -336,7 +389,7 @@ export function RapportsPage() {
         ], 44);
 
         addSectionLabel(t('pages.reports.salesEvolution'), 74);
-        let nextY = addChartImage(imgVentesLine, captureVentesLineRef.current, M, 78, PW - M * 2, 68);
+        const nextY = addChartImage(imgVentesLine, captureVentesLineRef.current, M, 78, PW - M * 2, 68);
 
         addSectionLabel(t('pages.reports.orderCount'), nextY + 6);
         addChartImage(imgVentesBar, captureVentesBarRef.current, M, nextY + 10, PW - M * 2, 68);

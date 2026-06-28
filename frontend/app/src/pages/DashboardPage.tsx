@@ -38,19 +38,12 @@ import type { LucideIcon } from 'lucide-react';
 
 const COLORS = ['#0ea5e9', '#64748b', '#14b8a6', '#f59e0b', '#94a3b8'];
 const CHART_GRID = '#e2e8f0';
+const SALES_STATUSES = new Set<StatutCommande>([StatutCommande.CONFIRMEE, StatutCommande.LIVREE]);
 
 type UserWithName = {
   nom?: string;
   prenom?: string;
 };
-
-function stableMetric(seed: string, min: number, range: number) {
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) % 100000;
-  }
-  return min + (hash % range);
-}
 
 interface MetricCardProps {
   label: string;
@@ -93,6 +86,7 @@ export function DashboardPage() {
     commandes,
     factures,
     produits,
+    lignesCommande,
     interactions,
   } = useStore();
 
@@ -116,7 +110,8 @@ export function DashboardPage() {
   }, [user, userFirstName, userLastName]);
 
   const kpis = useMemo(() => {
-    const totalVentes = commandes.reduce((sum, c) => sum + c.montantTotal, 0);
+    const salesOrders = commandes.filter((c) => SALES_STATUSES.has(c.statut));
+    const totalVentes = salesOrders.reduce((sum, c) => sum + c.montantTotal, 0);
     const totalClients = clients.length;
     const totalProspects = prospects.length;
     const totalCommandes = commandes.length;
@@ -134,21 +129,30 @@ export function DashboardPage() {
       totalCommandes,
       commandesEnCours,
       facturesEnAttente,
-      panierMoyen: totalCommandes > 0 ? totalVentes / totalCommandes : 0,
+      panierMoyen: salesOrders.length > 0 ? totalVentes / salesOrders.length : 0,
     };
   }, [clients, prospects, commandes, factures]);
 
   const ventesParMois = useMemo(() => {
     const mois = locale === 'en-US'
-      ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-      : ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin'];
+      ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      : ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aout', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentYear = new Date().getFullYear();
+    const months = mois.map((m) => ({ mois: m, montant: 0, commandes: 0 }));
 
-    return mois.map((m) => ({
-      mois: m,
-      montant: stableMetric(m, 5000, 10000),
-      commandes: stableMetric(`${m}-orders`, 5, 20),
-    }));
-  }, [locale]);
+    commandes
+      .filter((commande) => SALES_STATUSES.has(commande.statut))
+      .forEach((commande) => {
+        const date = new Date(commande.dateCommande);
+        if (date.getFullYear() !== currentYear) return;
+
+        const bucket = months[date.getMonth()];
+        bucket.montant += commande.montantTotal;
+        bucket.commandes += 1;
+      });
+
+    return months;
+  }, [commandes, locale]);
 
   const commandesParStatut = useMemo(() => {
     const stats = Object.values(StatutCommande).map((statut) => ({
@@ -159,12 +163,31 @@ export function DashboardPage() {
   }, [commandes]);
 
   const topProduits = useMemo(() => {
-    return produits.slice(0, 5).map((p) => ({
-      name: p.nom,
-      ventes: stableMetric(p.id || p.nom, 10, 50),
-      revenu: p.prix * stableMetric(`${p.id || p.nom}-revenue`, 10, 50),
-    }));
-  }, [produits]);
+    const salesOrderIds = new Set(
+      commandes
+        .filter((commande) => SALES_STATUSES.has(commande.statut))
+        .map((commande) => commande.id)
+    );
+    const productNames = new Map(produits.map((produit) => [produit.id, produit.nom]));
+    const totals = new Map<string, { name: string; ventes: number; revenu: number }>();
+
+    lignesCommande
+      .filter((ligne) => salesOrderIds.has(ligne.commandeId))
+      .forEach((ligne) => {
+        const current = totals.get(ligne.produitId) ?? {
+          name: productNames.get(ligne.produitId) ?? ligne.produitId,
+          ventes: 0,
+          revenu: 0,
+        };
+        current.ventes += ligne.quantite;
+        current.revenu += ligne.sousTotal;
+        totals.set(ligne.produitId, current);
+      });
+
+    return Array.from(totals.values())
+      .sort((a, b) => b.ventes - a.ventes)
+      .slice(0, 5);
+  }, [commandes, lignesCommande, produits]);
 
   const recentActivity = useMemo(() => {
     return interactions

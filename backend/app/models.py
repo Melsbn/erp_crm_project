@@ -112,6 +112,9 @@ class FactureModel(BaseModel):
         db[FactureModel.collection].create_index("commandeId")
         db[FactureModel.collection].create_index("clientId")
         db[FactureModel.collection].create_index("statutPaiement")
+        db[FactureModel.collection].create_index("dateCreation")
+        db[FactureModel.collection].create_index("autoReminderSentAt")
+        db[FactureModel.collection].create_index("autoReminderClaimedAt")
 
 
 class PaiementModel(BaseModel):
